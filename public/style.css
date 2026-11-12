@@ -1,3 +1,7 @@
+/* Fuentes alojadas en el propio servidor (sin depender de Google Fonts: cargan más rápido y no bloquean la página). */
+@font-face { font-family: "Luckiest Guy"; font-style: normal; font-weight: 400; font-display: swap; src: url(fonts/luckiest-guy-latin.woff2) format("woff2"); }
+@font-face { font-family: "Nunito"; font-style: normal; font-weight: 200 1000; font-display: swap; src: url(fonts/nunito-latin.woff2) format("woff2"); }
+
 :root {
   --fondo: #0b0f1e;
   --tarjeta: #161c33;
@@ -477,3 +481,641 @@ input:focus { outline: none; border-color: var(--acento); }
 .panel-juego { top: calc(54px + var(--seguro-arriba)); width: min(260px, 30vw); }
 .btn-accion { padding: 0; }
 .lista-tareas { max-width: min(250px, 30vw); }
+
+/* ======================================================================
+   Fase 6: diseño y animación (minimapa, pantallas, botones, carteles)
+   ====================================================================== */
+:root {
+  --fuente-titulo: "Lilita One", system-ui, sans-serif;
+  --fuente: "Nunito", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --vidrio: rgba(14, 19, 42, 0.62);
+  --borde-vidrio: rgba(140, 160, 255, 0.28);
+  --cian: #4fd8ff;
+}
+html, body { font-family: var(--fuente); }
+h2, .cartel-titulo, .reunion-cabeza h2, .btn-accion, .lista-cabeza, .barra-tareas span { font-family: var(--fuente-titulo); font-weight: 400; letter-spacing: .5px; }
+
+/* --- Pantalla de inicio --- */
+#inicio { background: radial-gradient(ellipse at 50% 120%, rgba(90, 60, 200, .35), transparent 60%), radial-gradient(ellipse at 10% -10%, rgba(40, 180, 255, .18), transparent 50%); }
+#inicio .tarjeta { animation: entrar .6s cubic-bezier(.2, 1.4, .4, 1) both; }
+.tarjeta {
+  background: linear-gradient(160deg, rgba(30, 38, 80, .82), rgba(14, 18, 40, .88));
+  border: 2px solid var(--borde-vidrio);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .55), inset 0 1px 0 rgba(255, 255, 255, .12);
+}
+.logo { font-family: var(--fuente-titulo); font-weight: 400; font-size: 56px; letter-spacing: 4px; text-shadow: none; display: flex; justify-content: center; gap: 1px; }
+.logo span {
+  display: inline-block;
+  color: var(--acento);
+  text-shadow: 0 4px 0 #c0392b, 0 8px 0 rgba(0, 0, 0, .35);
+  -webkit-text-stroke: 2px #1b1b1b;
+  animation: letraSalta 2.6s ease-in-out infinite;
+  animation-delay: calc(var(--i) * .12s);
+}
+.logo span:nth-child(3), .logo span:nth-child(5) { color: #ff6b81; text-shadow: 0 4px 0 #8e1f37, 0 8px 0 rgba(0, 0, 0, .35); }
+@keyframes letraSalta { 0%, 60%, 100% { transform: translateY(0) rotate(0); } 30% { transform: translateY(-9px) rotate(-4deg); } }
+.sub { font-weight: 800; letter-spacing: .5px; }
+@keyframes entrar { from { opacity: 0; transform: translateY(24px) scale(.92); } to { opacity: 1; transform: none; } }
+@keyframes aparecer { from { opacity: 0; transform: scale(.85); } to { opacity: 1; transform: none; } }
+
+input { background: rgba(8, 11, 26, .7); border: 2px solid var(--borde-vidrio); transition: border-color .2s, box-shadow .2s; }
+input:focus { box-shadow: 0 0 0 4px rgba(255, 204, 51, .2); }
+
+/* --- Botones --- */
+.btn {
+  font-family: var(--fuente);
+  font-weight: 900;
+  background: linear-gradient(180deg, #ffe066, var(--acento) 55%, #f0a91c);
+  position: relative;
+  overflow: hidden;
+  transition: transform .08s, box-shadow .08s, filter .2s;
+}
+.btn::after {
+  content: "";
+  position: absolute;
+  top: 0; bottom: 0; left: -60%;
+  width: 40%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .55), transparent);
+  transform: skewX(-20deg);
+  animation: brillo 3.5s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes brillo { 0%, 65% { left: -60%; } 100% { left: 130%; } }
+.btn-verde { background: linear-gradient(180deg, #6ff09a, var(--verde) 55%, #1f9a4b); }
+.btn:disabled { filter: grayscale(.7) brightness(.7); }
+.btn:disabled::after { display: none; }
+#btnEmpezar { animation: latido 1.4s ease-in-out infinite; }
+@keyframes latido { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.07); } }
+
+.btn-icono { background: var(--vidrio); border-color: var(--borde-vidrio); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); transition: transform .1s; }
+.btn-icono:active { transform: scale(.88); }
+.chip { background: var(--vidrio); border-color: var(--borde-vidrio); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); animation: aparecer .3s ease-out both; }
+.chip-impostor { border-color: var(--rojo); box-shadow: 0 0 12px rgba(255, 77, 94, .35); }
+.chip-tripulante { border-color: #4fb3ff; box-shadow: 0 0 12px rgba(79, 179, 255, .3); }
+
+/* Botones de acción: icono arriba, texto abajo, brillo cuando se pueden usar */
+.btn-accion {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  line-height: 1;
+  font-size: 15px;
+  background: radial-gradient(circle at 35% 28%, #fff1a6, var(--acento) 45%, #e0951a);
+  box-shadow: 0 5px 0 #1b1b1b, inset 0 -6px 10px rgba(0, 0, 0, .18);
+  transition: transform .08s, box-shadow .08s, opacity .25s, filter .25s;
+}
+.btn-accion::before { content: attr(data-icono); font-size: 26px; line-height: 1.05; margin-bottom: 2px; font-family: system-ui, sans-serif; }
+.btn-accion:active:not(:disabled) { transform: translateY(4px) scale(.96); box-shadow: 0 1px 0 #1b1b1b; }
+.btn-accion:disabled { opacity: .38; filter: grayscale(.6); }
+.btn-accion:not(:disabled) { animation: aura 1.3s ease-in-out infinite; }
+@keyframes aura { 0%, 100% { box-shadow: 0 5px 0 #1b1b1b, 0 0 0 0 rgba(255, 220, 90, .55); } 50% { box-shadow: 0 5px 0 #1b1b1b, 0 0 0 10px rgba(255, 220, 90, 0); } }
+.btn-matar { background: radial-gradient(circle at 35% 28%, #ff9aa5, var(--rojo) 45%, #a3172a); }
+.btn-matar:not(:disabled) { animation: auraRoja .9s ease-in-out infinite; }
+@keyframes auraRoja { 0%, 100% { box-shadow: 0 5px 0 #1b1b1b, 0 0 0 0 rgba(255, 60, 80, .7); } 50% { box-shadow: 0 5px 0 #1b1b1b, 0 0 0 12px rgba(255, 60, 80, 0); } }
+.btn-reportar { background: radial-gradient(circle at 35% 28%, #ffd2a1, #ff9a3c 45%, #c4601a); font-size: 11px !important; }
+.btn-sabotear { background: radial-gradient(circle at 35% 28%, #ff7d92, #b0203a 50%, #6e0c20); font-size: 11px !important; }
+.btn-vent { background: radial-gradient(circle at 35% 28%, #b3bacb, #6a7184 50%, #3c4152); font-size: 12px !important; }
+.btn-accion .cd { border-radius: 50%; background: rgba(0, 0, 0, .45); font-family: var(--fuente-titulo); }
+
+@media (max-height: 430px) {
+  .btn-accion::before { font-size: 22px; }
+  .btn-accion { font-size: 13px; }
+  .logo { font-size: 40px; }
+}
+
+/* --- Barra de tareas con brillo que corre --- */
+.barra-tareas { background: var(--vidrio); border-color: var(--borde-vidrio); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.barra-relleno {
+  background: linear-gradient(90deg, #2fae55, #5fe08a, #2fae55);
+  background-size: 200% 100%;
+  animation: correBarra 2s linear infinite;
+  box-shadow: 0 0 10px rgba(95, 224, 138, .6);
+  transition: width .8s cubic-bezier(.2, 1.3, .4, 1);
+}
+@keyframes correBarra { to { background-position: -200% 0; } }
+
+.lista-tareas { background: var(--vidrio); border-color: var(--borde-vidrio); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.lista-tareas li.recien { animation: tachar .6s ease-out; }
+@keyframes tachar { 0% { transform: scale(1.15); color: #fff; } 100% { transform: none; } }
+.alerta-sabotaje { animation: parpadeo 1s infinite, sacudir .5s; box-shadow: 0 0 18px rgba(255, 50, 70, .6); font-family: var(--fuente-titulo); font-weight: 400; letter-spacing: .4px; }
+
+/* --- Minimapa --- */
+.minimapa {
+  position: absolute;
+  top: calc(54px + var(--seguro-arriba));
+  right: calc(10px + var(--seguro-der));
+  width: 150px; height: 95px;
+  padding: 0;
+  border-radius: 14px;
+  border: 2px solid var(--borde-vidrio);
+  background: rgba(6, 9, 22, .72);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .45), inset 0 0 18px rgba(79, 216, 255, .12);
+  overflow: hidden;
+  cursor: pointer;
+  animation: aparecer .4s ease-out both;
+  transition: transform .1s;
+}
+.minimapa:active { transform: scale(.94); }
+.minimapa canvas { width: 100%; height: 100%; display: block; }
+.minimapa::after { /* barrido de radar */
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent 0, rgba(79, 216, 255, .16) 48%, transparent 52%);
+  background-size: 200% 100%;
+  animation: radar 3s linear infinite;
+  pointer-events: none;
+}
+@keyframes radar { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+.minimapa-etiqueta { position: absolute; left: 6px; bottom: 3px; font-family: var(--fuente-titulo); font-size: 10px; letter-spacing: 1px; color: rgba(200, 220, 255, .75); pointer-events: none; }
+@media (max-height: 430px) { .minimapa { width: 128px; height: 81px; } }
+
+.mapa-grande {
+  position: fixed; inset: 0;
+  z-index: 7;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(3, 6, 16, .45);
+  pointer-events: none; /* el joystick sigue funcionando debajo */
+  animation: fundido .2s ease-out both;
+}
+.mapa-marco {
+  width: min(88vw, 150vh);
+  background: rgba(10, 14, 34, .86);
+  border: 3px solid rgba(79, 216, 255, .5);
+  border-radius: 18px;
+  padding: 6px 10px 8px;
+  box-shadow: 0 0 40px rgba(79, 216, 255, .2), 0 20px 60px rgba(0, 0, 0, .6);
+  animation: aparecer .3s cubic-bezier(.2, 1.4, .4, 1) both;
+}
+.mapa-marco canvas { width: 100%; height: auto; display: block; max-height: calc(100vh - 90px); object-fit: contain; }
+.mapa-cabeza { display: flex; justify-content: space-between; align-items: center; font-family: var(--fuente-titulo); font-size: 18px; color: var(--cian); margin-bottom: 4px; }
+.mapa-cabeza button { pointer-events: auto; }
+.mapa-leyenda { display: flex; flex-wrap: wrap; gap: 4px 14px; justify-content: center; font-size: 12px; font-weight: 800; color: var(--tenue); margin-top: 4px; }
+.mapa-leyenda i { display: inline-block; width: 10px; height: 10px; margin-right: 4px; vertical-align: -1px; border: 2px solid #141420; }
+.ley-yo { border-radius: 50%; background: #fff; }
+.ley-tarea { background: #ffd34d; transform: rotate(45deg); }
+.ley-emerg { border-radius: 50%; background: #ff3048; }
+.ley-vent { background: #9aa3c7; border-radius: 2px; }
+.ley-sab { border-radius: 50%; background: #ff3048; box-shadow: 0 0 0 3px rgba(255, 48, 72, .4); }
+@keyframes fundido { from { opacity: 0; } to { opacity: 1; } }
+
+/* --- Modales y toast --- */
+.modal { backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); animation: fundido .2s both; }
+.modal .tarjeta { animation: aparecer .3s cubic-bezier(.2, 1.4, .4, 1) both; }
+.toast { animation: subirToast .35s cubic-bezier(.2, 1.4, .4, 1) both; backdrop-filter: blur(6px); }
+@keyframes subirToast { from { opacity: 0; transform: translate(-50%, 30px); } to { opacity: 1; transform: translate(-50%, 0); } }
+.color { transition: transform .15s; box-shadow: inset 0 -5px 0 rgba(0, 0, 0, .25), inset 0 4px 0 rgba(255, 255, 255, .25); }
+.color:not(.tomado):active { transform: scale(.88); }
+.color.mio { animation: latido 1.2s ease-in-out infinite; }
+.opcion { transition: transform .1s, background .2s; }
+.opcion:active:not(:disabled) { transform: scale(.92); }
+.tarea-lista { animation: listo .5s cubic-bezier(.2, 1.6, .4, 1) both; font-family: var(--fuente-titulo); font-weight: 400; text-shadow: 0 0 20px rgba(95, 224, 138, .7); }
+@keyframes listo { from { transform: scale(.3) rotate(-10deg); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* --- Carteles --- */
+.cartel-titulo { animation: golpe .7s cubic-bezier(.2, 1.5, .4, 1) both; }
+@keyframes golpe { 0% { transform: scale(2.6); opacity: 0; letter-spacing: 20px; } 100% { transform: none; opacity: 1; } }
+.cartel canvas { animation: entrar .7s .25s cubic-bezier(.2, 1.4, .4, 1) both; }
+.cartel-sub { animation: fundido .5s .45s both; }
+#revelacion { overflow: hidden; }
+#revelacion > * { position: relative; }
+#revelacion.rol-impostor { background: radial-gradient(ellipse at 50% 60%, rgba(150, 10, 30, .94), rgba(3, 5, 12, .97) 70%); }
+#revelacion.rol-tripulante { background: radial-gradient(ellipse at 50% 60%, rgba(18, 80, 160, .93), rgba(3, 5, 12, .97) 70%); }
+#revelacion::before {
+  content: ""; position: absolute; inset: -50%;
+  background: repeating-conic-gradient(from 0deg, rgba(255, 255, 255, .05) 0 8deg, transparent 8deg 20deg);
+  animation: girar 18s linear infinite;
+  pointer-events: none;
+}
+@keyframes girar { to { transform: rotate(360deg); } }
+.titulo-impostor, .titulo-tripulante { font-family: var(--fuente-titulo); }
+#muerteAviso { animation: sacudir .45s; }
+#muerteAviso > * { position: relative; }
+#muerteAviso::before { content: ""; position: absolute; inset: 0; background: #ff2040; animation: destello .6s ease-out both; pointer-events: none; }
+@keyframes destello { from { opacity: .85; } to { opacity: 0; } }
+#expulsion .cartel-titulo { animation: none; font-family: var(--fuente); font-weight: 900; font-size: clamp(22px, 5vw, 38px); text-shadow: 0 3px 0 rgba(0, 0, 0, .5); }
+#fin { overflow: hidden; }
+#fin > * { position: relative; }
+#fin .cartel-titulo { font-size: clamp(40px, 10vw, 80px); }
+#fin > .confeti { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.confeti i { position: absolute; top: -20px; width: 10px; height: 16px; border-radius: 2px; animation: caer linear forwards; }
+@keyframes caer { to { transform: translateY(110vh) rotate(720deg); } }
+
+/* --- Aviso de reunión (antes de la pantalla de votación) --- */
+.aviso-reunion {
+  position: fixed; inset: 0; z-index: 29;
+  display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(circle, rgba(200, 20, 40, .9), rgba(40, 0, 8, .96) 70%);
+  overflow: hidden;
+  pointer-events: none;
+  animation: fundido .15s both;
+}
+.aviso-rayos { position: absolute; inset: -60%; background: repeating-conic-gradient(rgba(255, 220, 90, .16) 0 10deg, transparent 10deg 24deg); animation: girar 6s linear infinite; }
+.aviso-texto {
+  position: relative; margin: 0; text-align: center; padding: 0 16px;
+  font-family: var(--fuente-titulo); font-size: clamp(34px, 9vw, 76px); color: #fff;
+  -webkit-text-stroke: 3px #1b1b1b;
+  text-shadow: 0 6px 0 #1b1b1b, 0 0 30px rgba(255, 200, 80, .7);
+  animation: golpe .55s cubic-bezier(.2, 1.6, .4, 1) both, temblor .12s .55s 6;
+}
+@keyframes temblor { 50% { transform: translate(3px, -2px) rotate(1deg); } }
+
+/* --- Reunión --- */
+.reunion {
+  background: radial-gradient(circle at 30% 10%, #2c3880 0, #141a38 60%, #0b0f24 100%);
+  animation: fundido .3s both;
+}
+.reunion-cabeza h2 { font-size: 24px; text-shadow: 0 3px 0 rgba(0, 0, 0, .4); }
+.voto {
+  font-family: var(--fuente);
+  background: linear-gradient(180deg, #f4f6fc, #d8deec);
+  box-shadow: 0 3px 0 #141420;
+  transition: transform .1s;
+}
+.votos.entrando .voto { animation: entrar .4s cubic-bezier(.2, 1.4, .4, 1) both; }
+.votos.entrando .voto:nth-child(2) { animation-delay: .04s; } .votos.entrando .voto:nth-child(3) { animation-delay: .08s; }
+.votos.entrando .voto:nth-child(4) { animation-delay: .12s; } .votos.entrando .voto:nth-child(5) { animation-delay: .16s; }
+.votos.entrando .voto:nth-child(6) { animation-delay: .2s; } .votos.entrando .voto:nth-child(7) { animation-delay: .24s; }
+.votos.entrando .voto:nth-child(8) { animation-delay: .28s; } .votos.entrando .voto:nth-child(n+9) { animation-delay: .32s; }
+.voto:active:not(:disabled) { transform: scale(.96); }
+.voto.elegido { outline: 4px solid var(--acento); box-shadow: 0 0 18px rgba(255, 204, 51, .6), 0 3px 0 #141420; }
+.voto .confirmar { animation: latido .8s ease-in-out infinite; }
+#reunionTimer { font-family: var(--fuente-titulo); font-weight: 400; }
+.reunion .chat { background: rgba(10, 14, 32, .8); border-color: var(--borde-vidrio); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+}
+
+/* ======================================================================
+   Fase 6b: estilo "dibujado a mano" (contornos gruesos, bordes chuecos,
+   líneas que tiemblan, texto blanco con contorno negro)
+   ====================================================================== */
+:root {
+  --fuente-titulo: "Luckiest Guy", "Lilita One", system-ui, sans-serif;
+  --tinta: #141420;
+  --papel: #1d2442;
+  --chueco: 14px 6px 12px 5px / 5px 12px 6px 14px;
+  --chueco2: 6px 16px 7px 13px / 13px 6px 15px 7px;
+  --contorno: -2px -2px 0 var(--tinta), 2px -2px 0 var(--tinta), -2px 2px 0 var(--tinta), 2px 2px 0 var(--tinta),
+    0 -2.5px 0 var(--tinta), 0 2.5px 0 var(--tinta), -2.5px 0 0 var(--tinta), 2.5px 0 0 var(--tinta), 0 4px 0 var(--tinta);
+}
+h2, .cartel-titulo, .reunion-cabeza h2, .lista-cabeza, .barra-tareas span { letter-spacing: 1px; }
+
+/* Línea que "hierve": se alterna entre 3 versiones del mismo trazo */
+@keyframes hervir {
+  0% { filter: url(#garabato1); }
+  33% { filter: url(#garabato2); }
+  66% { filter: url(#garabato3); }
+}
+
+/* Fuera el vidrio y los brillos: todo plano, como recortado en papel */
+.tarjeta, .chip, .btn-icono, .barra-tareas, .lista-tareas, .minimapa, .mapa-marco, .toast, .menu-sabotaje, .chat {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+.btn::after { display: none; }
+
+/* Borde chueco y tembloroso dibujado encima de cada panel */
+.tarjeta, .chip, .btn-icono, .barra-tareas, .lista-tareas, .minimapa, .mapa-marco, .toast, .menu-sabotaje, .chat, .btn, .voto, .alerta-sabotaje {
+  position: relative;
+  border-color: transparent !important;
+  border-radius: var(--chueco);
+}
+.chip, .btn-icono { border-radius: var(--chueco2); }
+.tarjeta::before, .chip::before, .btn-icono::before, .barra-tareas::before, .lista-tareas::before, .minimapa::before,
+.mapa-marco::before, .toast::before, .menu-sabotaje::before, .chat::before, .btn::before, .voto::before, .alerta-sabotaje::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 3px solid var(--tinta);
+  border-radius: inherit;
+  pointer-events: none;
+  animation: hervir .5s steps(1) infinite;
+  z-index: 2;
+}
+.tarjeta::before, .lista-tareas::before, .chat::before, .mapa-marco::before { border-color: #f2f4ff; border-width: 3px; }
+.chip::before, .btn-icono::before, .barra-tareas::before, .minimapa::before, .toast::before { border-color: #e8ecff; }
+.chip-impostor::before { border-color: var(--rojo); }
+.chip-tripulante::before { border-color: #6cc4ff; }
+.chip-fantasma::before { border-color: #9aa3c7; }
+.alerta-sabotaje::before { border-color: #fff; }
+.menu-sabotaje::before { border-color: var(--rojo); }
+.mapa-marco::before { border-color: var(--cian); }
+.btn::before { border-width: 3px; }
+
+.tarjeta { background: var(--papel); box-shadow: 6px 8px 0 rgba(0, 0, 0, .45); }
+.chip, .btn-icono, .barra-tareas, .lista-tareas, .toast { background: rgba(20, 25, 48, .9); box-shadow: 3px 4px 0 rgba(0, 0, 0, .4); }
+.chip { font-family: var(--fuente-titulo); font-weight: 400; letter-spacing: 1px; text-shadow: 0 2px 0 rgba(0, 0, 0, .5); padding-top: 7px; }
+.chip-impostor, .chip-tripulante { box-shadow: 3px 4px 0 rgba(0, 0, 0, .4); }
+.btn-icono { color: #fff; }
+.minimapa { background: #0b1022; box-shadow: 3px 4px 0 rgba(0, 0, 0, .45); border-radius: var(--chueco); }
+.minimapa::after { display: none; } /* sin barrido de radar: más limpio */
+.minimapa-etiqueta { font-size: 11px; color: #fff; text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000; }
+
+/* Botones normales: color plano, sombra dura abajo, texto con contorno */
+.btn {
+  background: var(--acento);
+  font-family: var(--fuente-titulo);
+  font-weight: 400;
+  letter-spacing: 1px;
+  color: #fff;
+  text-shadow: var(--contorno);
+  box-shadow: 0 5px 0 var(--tinta);
+  padding-top: 12px;
+}
+.btn-chico { padding-top: 9px; }
+.btn-verde { background: #3fcf72; }
+.btn:active { transform: translateY(4px) rotate(-1deg); box-shadow: 0 1px 0 var(--tinta); }
+.btn-link { text-shadow: none; }
+.opcion { border-radius: var(--chueco2); border: 3px solid var(--tinta); font-family: var(--fuente-titulo); font-weight: 400; letter-spacing: .5px; }
+.opcion.activa { color: #fff; text-shadow: var(--contorno); }
+input { border-radius: var(--chueco2); border: 3px solid #4a5590; }
+.logo span { -webkit-text-stroke: 0; text-shadow: var(--contorno), 0 7px 0 rgba(0, 0, 0, .4); color: var(--acento); animation: letraSalta 2.6s ease-in-out infinite, hervir .5s steps(1) infinite; animation-delay: calc(var(--i) * .12s), 0s; }
+.logo span:nth-child(3), .logo span:nth-child(5) { color: #ff6b81; text-shadow: var(--contorno), 0 7px 0 rgba(0, 0, 0, .4); }
+
+/* --- Botones de acción: el dibujo ES el botón, texto blanco con contorno abajo --- */
+.btn-accion, .btn-matar, .btn-reportar, .btn-sabotear, .btn-vent {
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 0;
+  width: 86px; height: 92px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0;
+  position: relative;
+  animation: none !important;
+  filter: none;
+  opacity: 1;
+  font-size: 15px !important;
+}
+.btn-accion::before { content: none; }
+.btn-accion .ico {
+  width: 66px; height: 66px;
+  overflow: visible;
+  filter: drop-shadow(0 4px 0 rgba(0, 0, 0, .45));
+  transition: transform .1s;
+}
+.btn-accion .ico use { animation: hervir .5s steps(1) infinite; }
+.btn-accion .etq {
+  font-family: var(--fuente-titulo);
+  font-size: 17px;
+  letter-spacing: 1px;
+  line-height: 1;
+  color: #fff;
+  text-shadow: var(--contorno);
+  margin-top: -2px;
+  white-space: nowrap;
+}
+.btn-reportar .etq, .btn-sabotear .etq { font-size: 14px; }
+.btn-accion:disabled { opacity: 1; filter: none; }
+.btn-accion:disabled .ico { filter: grayscale(1) brightness(.55) drop-shadow(0 4px 0 rgba(0, 0, 0, .45)); opacity: .55; }
+.btn-accion:disabled .etq { color: #9aa0b4; opacity: .7; }
+.btn-accion:not(:disabled) .ico { animation: rebote 1.6s ease-in-out infinite; }
+.btn-matar:not(:disabled) .ico { animation: rebote .8s ease-in-out infinite; }
+@keyframes rebote { 0%, 100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-4px) rotate(-3deg); } }
+.btn-accion:active:not(:disabled) .ico { transform: scale(.86) rotate(4deg); }
+.btn-accion .cd {
+  inset: 0 0 18px 0;
+  background: none;
+  border-radius: 0;
+  font-family: var(--fuente-titulo);
+  font-size: 36px;
+  font-weight: 400;
+  color: #fff;
+  text-shadow: var(--contorno);
+}
+@media (max-height: 430px) {
+  .btn-accion, .btn-matar, .btn-reportar, .btn-sabotear, .btn-vent { width: 74px; height: 80px; }
+  .btn-accion .ico { width: 56px; height: 56px; }
+  .btn-accion .etq { font-size: 15px; }
+  .btn-reportar .etq, .btn-sabotear .etq { font-size: 12.5px; }
+}
+.botones-accion { gap: 6px; }
+
+/* Barra de tareas: verde plano con rayas, sin brillo */
+.barra { border: 3px solid var(--tinta); border-radius: var(--chueco2); background: #0b1022; }
+.barra-relleno { background: repeating-linear-gradient(-45deg, #43d06e 0 10px, #36b85e 10px 20px); box-shadow: none; animation: correRayas 1s linear infinite; }
+@keyframes correRayas { to { background-position: 28px 0; } }
+.barra-tareas span { color: #fff; text-shadow: -1.5px -1.5px 0 #000, 1.5px -1.5px 0 #000, -1.5px 1.5px 0 #000, 1.5px 1.5px 0 #000; }
+
+/* Carteles y reunión con el mismo trazo */
+.cartel-titulo { text-shadow: var(--contorno), 0 8px 0 rgba(0, 0, 0, .45); }
+.titulo-impostor { color: #ff4d5e; text-shadow: var(--contorno), 0 8px 0 rgba(0, 0, 0, .45), 0 0 30px rgba(255, 60, 80, .5); }
+.titulo-tripulante { color: #6cc4ff; text-shadow: var(--contorno), 0 8px 0 rgba(0, 0, 0, .45), 0 0 30px rgba(80, 180, 255, .5); }
+.cartel-titulo, .aviso-texto { animation: golpe .7s cubic-bezier(.2, 1.5, .4, 1) both, hervir .5s .7s steps(1) infinite; }
+.aviso-texto { -webkit-text-stroke: 0; text-shadow: var(--contorno), 0 8px 0 var(--tinta); }
+#expulsion .cartel-titulo { animation: hervir .5s steps(1) infinite; font-family: var(--fuente-titulo); font-weight: 400; color: #fff; }
+.reunion-cabeza h2 { color: var(--acento); text-shadow: var(--contorno); }
+#reunionTimer { padding-top: 7px; }
+.voto { background: #eef1f8; box-shadow: 3px 4px 0 rgba(0, 0, 0, .45); border-radius: var(--chueco2); }
+.voto::before { border-color: var(--tinta); }
+.voto.elegido { outline: none; background: #fff6c8; }
+.voto.elegido::before { border-color: #f0a91c; border-width: 4px; }
+.voto .confirmar { border-radius: var(--chueco2); font-family: var(--fuente-titulo); font-weight: 400; color: #fff; text-shadow: var(--contorno); border-width: 3px; padding-top: 6px; }
+.chat-cabeza { font-family: var(--fuente-titulo); font-weight: 400; letter-spacing: 1px; border-bottom: 3px dashed rgba(255, 255, 255, .25); }
+.chat-form { border-top: 3px dashed rgba(255, 255, 255, .25); }
+.mapa-cabeza { text-shadow: 0 2px 0 #000; }
+.tarea-lista { font-family: var(--fuente-titulo); text-shadow: var(--contorno); color: #5fe08a; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tarjeta::before, .chip::before, .btn-icono::before, .barra-tareas::before, .lista-tareas::before, .minimapa::before,
+  .mapa-marco::before, .toast::before, .menu-sabotaje::before, .chat::before, .btn::before, .voto::before, .alerta-sabotaje::before,
+  .btn-accion .ico use, .logo span { animation: none !important; filter: url(#garabato1); }
+}
+/* Los que ya estaban posicionados conservan su posición (la regla de arriba los dejaba en "relative") */
+.minimapa, .lista-tareas, .menu-sabotaje { position: absolute; }
+.toast { position: fixed; }
+.chat-form .btn { padding: 8px 10px 6px; letter-spacing: 0; font-size: 14px; }
+.btn-accion:has(.cd:not(:empty)) .ico { filter: grayscale(1) brightness(.5) drop-shadow(0 4px 0 rgba(0, 0, 0, .45)); animation: none; }
+
+/* ---------- Fase 6c: lo mismo, pero nítido (sin filtros de píxeles) ----------
+   El temblor ahora es de transformaciones (vector, sin dientes) y el contorno
+   del texto es un trazo real en lugar de 8 sombras. */
+@keyframes hervir {
+  0%   { transform: rotate(0deg) translate(0, 0); }
+  33%  { transform: rotate(.35deg) translate(.5px, -.4px); }
+  66%  { transform: rotate(-.3deg) translate(-.4px, .5px); }
+}
+.tarjeta::before, .chip::before, .btn-icono::before, .barra-tareas::before, .lista-tareas::before, .minimapa::before,
+.mapa-marco::before, .toast::before, .menu-sabotaje::before, .chat::before, .btn::before, .voto::before, .alerta-sabotaje::before {
+  filter: none !important;
+  animation: hervir .5s steps(1) infinite;
+}
+.btn-accion .ico use { transform-box: fill-box; transform-origin: center; animation: hervir .45s steps(1) infinite; filter: none; }
+.logo span { animation: letraSalta 2.6s ease-in-out infinite; animation-delay: calc(var(--i) * .12s); }
+
+/* Contorno de texto con trazo (paint-order: el trazo va detrás del relleno) */
+:root { --contorno: 0 4px 0 var(--tinta); }
+.btn, .btn-accion .etq, .btn-accion .cd, .opcion.activa, .cartel-titulo, .aviso-texto, .reunion-cabeza h2,
+.voto .confirmar, .tarea-lista, .logo span, .titulo-impostor, .titulo-tripulante {
+  -webkit-text-stroke: 5px var(--tinta);
+  paint-order: stroke fill;
+}
+.btn-accion .etq { -webkit-text-stroke-width: 4.5px; }
+.btn-chico, .chat-form .btn, .opcion.activa, .voto .confirmar { -webkit-text-stroke-width: 4px; }
+.cartel-titulo, .aviso-texto { -webkit-text-stroke-width: 8px; }
+.logo span { -webkit-text-stroke-width: 7px; }
+.titulo-impostor { text-shadow: 0 6px 0 var(--tinta), 0 0 30px rgba(255, 60, 80, .5); }
+.titulo-tripulante { text-shadow: 0 6px 0 var(--tinta), 0 0 30px rgba(80, 180, 255, .5); }
+.logo span, .logo span:nth-child(3), .logo span:nth-child(5) { text-shadow: 0 5px 0 var(--tinta), 0 9px 0 rgba(0, 0, 0, .35); }
+
+/* Íconos: sombra suave en vez de sombra filtrada */
+.btn-accion .ico { filter: drop-shadow(0 3px 0 rgba(0, 0, 0, .5)); }
+.btn-accion:disabled .ico, .btn-accion:has(.cd:not(:empty)) .ico { filter: grayscale(1) brightness(.55); }
+
+@media (prefers-reduced-motion: reduce) {
+  .tarjeta::before, .chip::before, .btn-icono::before, .barra-tareas::before, .lista-tareas::before, .minimapa::before,
+  .mapa-marco::before, .toast::before, .menu-sabotaje::before, .chat::before, .btn::before, .voto::before, .alerta-sabotaje::before,
+  .btn-accion .ico use, .logo span { animation: none !important; filter: none !important; }
+}
+/* Luckiest Guy tiene minúsculas raras: todo en mayúsculas */
+.btn, .chip, .opcion, h2, .cartel-titulo, .lista-cabeza, .chat-cabeza, .mapa-cabeza, .voto .confirmar, .aviso-texto, .alerta-sabotaje { text-transform: uppercase; }
+
+/* Arreglo: el borde dibujado quedaba 3px adentro del borde real (los hijos absolutos se miden
+   desde el área interior), y por el hueco se veía el fondo: "doble borde" amarillo en los botones.
+   Ahora el borde real es 0 y la línea dibujada ocupa exactamente la orilla. */
+.tarjeta, .chip, .btn-icono, .barra-tareas, .lista-tareas, .minimapa, .mapa-marco, .toast, .menu-sabotaje, .chat, .btn, .voto, .alerta-sabotaje {
+  border-width: 0 !important;
+  overflow: visible;
+}
+.tarjeta { overflow-y: auto; padding: 20px 22px; }
+.chat, .minimapa { overflow: hidden; }
+.btn { padding: 13px 18px 10px; }
+.btn-chico { padding: 10px 14px 7px; }
+.btn-grande { padding: 15px 16px 12px; }
+.chip { padding: 8px 14px 6px; }
+.voto { padding: 8px 10px; }
+.fila { align-items: stretch; }
+.fila .btn { margin-bottom: 5px; }
+#bloqueNormal, #bloqueInvitacion { display: flex; flex-direction: column; gap: 14px; }
+#bloqueInvitacion.oculto, #bloqueNormal.oculto { display: none !important; }
+@media (max-height: 430px) {
+  .tarjeta { padding: 14px 20px; }
+  #bloqueNormal, #bloqueInvitacion { gap: 11px; }
+}
+@media (max-height: 380px) { .tarjeta { padding: 10px 20px; } .logo { font-size: 36px; } }
+/* El borde que tiembla no debe salirse de la tarjeta (si no, aparece barra de scroll) */
+.tarjeta::before { inset: 3px; }
+.tarjeta { scrollbar-width: thin; }
+.btn::before, .chip::before, .btn-icono::before, .voto::before { inset: -1.5px; }
+.chat::before, .minimapa::before { inset: 2px; }
+.chat-form { padding: 8px 10px 10px; }
+
+/* ======================================================================
+   Fase 7: íconos propios, tareas difíciles, tareas por etapas, teclas
+   ====================================================================== */
+.icono { width: 1.25em; height: 1.25em; flex: none; vertical-align: -0.28em; overflow: visible; }
+.btn-icono .icono { width: 24px; height: 24px; vertical-align: 0; }
+.btn-icono-chico .icono { width: 17px; height: 17px; }
+.chip .icono, .alerta-sabotaje .icono { margin-right: 6px; }
+.chip, .alerta-sabotaje { display: inline-flex; align-items: center; }
+.alerta-sabotaje { justify-content: center; }
+.lista-cabeza .icono { width: 12px; height: 12px; vertical-align: -1px; }
+.lista-tareas.plegada .lista-cabeza .icono { transform: rotate(-90deg); }
+.lista-tareas li.sabotaje { display: flex; align-items: center; gap: 4px; }
+.lista-tareas li.sabotaje .icono { width: 16px; height: 16px; }
+.chat-cabeza span { display: inline-flex; align-items: center; gap: 6px; }
+#chatTitulo { display: inline-flex; align-items: center; gap: 6px; }
+.icono-texto { width: 16px; height: 16px; margin-right: 4px; vertical-align: -3px; }
+.btn-con-icono { display: inline-flex; align-items: center; gap: 8px; }
+.btn-con-icono .icono { width: 26px; height: 26px; }
+.marca-icono { background: transparent !important; padding: 0 !important; }
+.marca-icono .icono { width: 26px; height: 26px; }
+.voto .confirmar { display: inline-flex; align-items: center; gap: 4px; }
+.voto .confirmar .icono { width: 18px; height: 18px; }
+.girar-icono .icono { width: 110px; height: 110px; animation: girarCel 2s ease-in-out infinite; }
+@keyframes girarCel { 0%, 30% { transform: rotate(0); } 60%, 100% { transform: rotate(90deg); } }
+.tarjeta-id .icono { width: 66px; height: 66px; }
+.mano .icono { width: 96px; height: 96px; }
+@media (max-height: 430px) { .mano .icono { width: 76px; height: 76px; } }
+.tecla .icono { width: 30px; height: 30px; vertical-align: middle; }
+.btn-accion.tecla-activa .ico { transform: scale(.86) rotate(4deg); }
+
+/* Etiqueta de tarea difícil en la lista */
+.dificil {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 5px 0;
+  font-family: var(--fuente-titulo);
+  font-weight: 400;
+  font-size: 10px;
+  letter-spacing: .5px;
+  color: #fff;
+  background: #e8263b;
+  border: 2px solid var(--tinta);
+  border-radius: var(--chueco2);
+  transform: rotate(-4deg);
+  vertical-align: 1px;
+}
+.lista-tareas li.hecha .dificil { background: #3a8a55; }
+.lista-tareas li.recien:not(.hecha) { animation: tachar .6s ease-out; color: #ffd34d; }
+
+/* Mapa grande: que todo el mapa quepa a lo alto */
+.mapa-marco { width: min(90vw, calc((100vh - 96px) * 1.55)); }
+.mapa-marco canvas { max-height: none; }
+
+/* --- Secuencia --- */
+.sec-leds { display: flex; gap: 10px; }
+.sec-leds i { width: 18px; height: 18px; border-radius: 50%; background: #2b3348; border: 3px solid var(--tinta); }
+.sec-leds i.ok { background: #5fe08a; box-shadow: 0 0 10px #5fe08a; }
+.sec-grid { display: grid; grid-template-columns: repeat(3, 62px); gap: 8px; }
+.sec-pad {
+  height: 62px;
+  border: 3px solid var(--tinta);
+  border-radius: var(--chueco2);
+  background: color-mix(in srgb, var(--c) 30%, #1b2140);
+  box-shadow: 0 4px 0 var(--tinta);
+  transition: transform .06s;
+}
+.sec-pad.luz { background: var(--c); box-shadow: 0 0 22px var(--c), 0 4px 0 var(--tinta); transform: scale(1.06); }
+.sec-pad:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--tinta); }
+@media (max-height: 430px) { .sec-grid { grid-template-columns: repeat(3, 50px); gap: 6px; } .sec-pad { height: 50px; } }
+
+/* --- Frecuencia --- */
+.onda { width: 100%; max-width: 520px; height: auto; border: 3px solid var(--tinta); border-radius: var(--chueco); }
+.deslizador { display: flex; align-items: center; gap: 10px; width: 100%; max-width: 520px; font-weight: 800; font-size: 14px; }
+.deslizador span { width: 90px; flex: none; }
+.deslizador input { flex: 1; padding: 0; border: 0; height: 34px; accent-color: #ffcc33; background: transparent; touch-action: none; }
+@media (max-height: 430px) { .onda { max-width: 420px; } .deslizador input { height: 28px; } }
+
+/* --- Ordenar --- */
+.ord-caja { position: relative; width: 100%; max-width: 520px; height: 190px; background: #0b1022; border: 3px solid var(--tinta); border-radius: var(--chueco); }
+.ord-num {
+  position: absolute;
+  width: 15%; height: 28%;
+  font-family: var(--fuente-titulo);
+  font-size: 22px;
+  color: #fff;
+  -webkit-text-stroke: 4px var(--tinta);
+  paint-order: stroke fill;
+  background: #2f6fe0;
+  border: 3px solid var(--tinta);
+  border-radius: var(--chueco2);
+  box-shadow: 0 3px 0 var(--tinta);
+}
+.ord-num.ok { background: #3fcf72; opacity: .55; }
+.ord-tiempo { transition: none; background: repeating-linear-gradient(-45deg, #ffcc33 0 10px, #f0a91c 10px 20px); }
+@media (max-height: 430px) { .ord-caja { height: 150px; } .ord-num { font-size: 18px; } }
+.lista-cabeza .icono { width: 16px; height: 16px; vertical-align: -3px; }
+
+/* ---------- Rendimiento (Fase 8) ----------
+   Mientras se juega, el CPU del celular es para dibujar el mundo. Las animaciones que repintan sin parar
+   (rayas de la barra, bordes que "hierven") se congelan en el HUD y en los minijuegos; en menús, lobby
+   y reunión se conservan. */
+.barra-relleno { animation: none !important; }
+#hud *::before, #hud .ico use, #tareaModal *::before, #tareaModal .ico use { animation: none !important; }
+#reunion *::before, .mapa-grande *::before { animation: none !important; }
+/* Rendimiento: el rebote continuo de los botones activos mantenía una animación corriendo todo el tiempo.
+   Ahora es un "pop" de una sola vez al activarse el botón (avisa igual, sin costo después). */
+.btn-accion:not(:disabled) .ico, .btn-matar:not(:disabled) .ico { animation: pop .45s cubic-bezier(.2, 1.6, .4, 1); }
+@keyframes pop { 0% { transform: scale(.55) rotate(-10deg); } 100% { transform: none; } }

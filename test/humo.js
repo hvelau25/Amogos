@@ -3,7 +3,7 @@ const { io } = require('socket.io-client');
 const URL = process.env.URL || 'http://localhost:3000';
 const c = (o) => io(URL, { transports: ['websocket'], forceNew: true, ...o });
 const emit = (s, ev, d) => new Promise((r) => s.emit(ev, d, r));
-const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const wait = (ms) => new Promise((r) => setTimeout(r, ms + (Number(process.env.LAG) || 0))); // LAG=ms extra para probar contra un servidor remoto
 const ok = (cond, msg) => { if (!cond) { console.error('FALLA:', msg); process.exit(1); } console.log('ok -', msg); };
 
 (async () => {

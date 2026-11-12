@@ -40,7 +40,12 @@
     tarjeta: 'Pasar tarjeta',
     interruptores: 'Encender interruptores',
     calibrar: 'Calibrar medidor',
+    secuencia: 'Repetir secuencia',
+    frecuencia: 'Sintonizar frecuencia',
+    ordenar: 'Reiniciar en orden',
   };
+  // Tareas difíciles (se marcan en la lista).
+  const HARD_TASKS = ['secuencia', 'frecuencia', 'ordenar'];
 
   function impostorCount(players, setting) {
     const auto = players <= 6 ? 1 : players <= 9 ? 2 : 3;
@@ -144,6 +149,14 @@
         { id: 'cal_rea', type: 'calibrar', room: 'Reactor', x: 4.5, y: 13.6 },
         { id: 'cal_esc', type: 'calibrar', room: 'Escudos', x: 43.5, y: 26.6 },
         { id: 'cal_nav', type: 'calibrar', room: 'Navegación', x: 52.5, y: 14.6 },
+        { id: 'sec_esc', type: 'secuencia', room: 'Escudos', x: 46, y: 26.6 },
+        { id: 'fre_com', type: 'frecuencia', room: 'Comunicaciones', x: 37.8, y: 30.6 },
+        { id: 'ord_bod', type: 'ordenar', room: 'Bodega', x: 31.5, y: 24.6 },
+      ],
+      // Tareas de varias etapas: cada etapa en otra sala, en este orden.
+      chains: [
+        { id: 'cad_cables', type: 'cables', name: 'Reparar cableado', steps: ['cab_ele', 'cab_adm', 'cab_oxi'] },
+        { id: 'cad_datos', type: 'descarga', name: 'Descargar y subir datos', steps: ['des_caf', 'des_com'] },
       ],
       // Dónde se arreglan los sabotajes.
       fixes: {
@@ -243,6 +256,13 @@
         { id: 'cab_ele', type: 'cables', room: 'Eléctrica', x: 14.5, y: 30.6 },
         { id: 'cod_fri', type: 'codigo', room: 'Frigorífico', x: 16.5, y: 16.6 },
         { id: 'tar_com', type: 'tarjeta', room: 'Sala común', x: 27.5, y: 15.6 },
+        { id: 'sec_dor', type: 'secuencia', room: 'Dormitorios', x: 56, y: 6.6 },
+        { id: 'fre_gar', type: 'frecuencia', room: 'Garaje de trineos', x: 42, y: 29.6 },
+        { id: 'ord_alm', type: 'ordenar', room: 'Almacén', x: 29.5, y: 30.6 },
+      ],
+      chains: [
+        { id: 'cad_cables', type: 'cables', name: 'Reparar cableado', steps: ['cab_inv', 'cab_gar', 'cab_ele'] },
+        { id: 'cad_datos', type: 'descarga', name: 'Descargar y subir datos', steps: ['des_obs', 'des_rad'] },
       ],
       fixes: {
         luces: { x: 17.5, y: 30.6, room: 'Eléctrica' },
@@ -338,6 +358,21 @@
     return { x: (s.x + Math.cos(a) * rad) * TILE, y: (s.y + Math.sin(a) * rad) * TILE };
   }
 
+  // Tareas que se pueden repartir: cadenas (varias etapas) + estaciones sueltas que no son parte de una cadena.
+  function taskPool(map) {
+    const chains = map.chains || [];
+    const used = new Set(chains.flatMap((c) => c.steps));
+    return chains.map((c) => ({ id: c.id, steps: c.steps.slice() }))
+      .concat((map.tasks || []).filter((t) => !used.has(t.id)).map((t) => ({ id: t.id, steps: [t.id] })));
+  }
+  // Nombre que se muestra de una tarea (cadena o suelta).
+  function taskName(map, id) {
+    const c = (map.chains || []).find((q) => q.id === id);
+    if (c) return c.name;
+    const t = (map.tasks || []).find((q) => q.id === id);
+    return t ? TASK_TYPES[t.type] : '';
+  }
+
   function roomAt(map, x, y) {
     const tx = Math.floor(x / TILE), ty = Math.floor(y / TILE);
     if (tx < 0 || ty < 0 || tx >= map.width || ty >= map.height) return null;
@@ -345,5 +380,5 @@
     return i >= 0 ? map.rooms[i] : null;
   }
 
-  return { MAP_CHOICES, SABOTAGE_COOLDOWN, REACTOR_TIME, LIGHTS_VISION, TASK_TYPES, TILE, PLAYER_RADIUS, PLAYER_SPEED, MAX_PLAYERS, NAME_MAX, MIN_PLAYERS, KILL_RANGE, REPORT_RANGE, USE_RANGE, VISION, CHAT_MAX, SETTINGS_OPTIONS, DEFAULT_SETTINGS, impostorCount, COLORS, MAPS, isSolidTile, collides, move, spawnPoint, roomAt };
+  return { taskPool, taskName, HARD_TASKS, MAP_CHOICES, SABOTAGE_COOLDOWN, REACTOR_TIME, LIGHTS_VISION, TASK_TYPES, TILE, PLAYER_RADIUS, PLAYER_SPEED, MAX_PLAYERS, NAME_MAX, MIN_PLAYERS, KILL_RANGE, REPORT_RANGE, USE_RANGE, VISION, CHAT_MAX, SETTINGS_OPTIONS, DEFAULT_SETTINGS, impostorCount, COLORS, MAPS, isSolidTile, collides, move, spawnPoint, roomAt };
 });

@@ -10,15 +10,63 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <title>Amogos</title>
+  <link rel="preload" href="fonts/luckiest-guy-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/nunito-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <!-- Íconos propios de los botones (estilo dibujado a mano) -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-usar" viewBox="0 0 64 64">
+      <rect x="21" y="9" width="10" height="30" rx="5" fill="#f4f6fc" stroke="#141420" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>
+      <rect x="31" y="5" width="10" height="33" rx="5" fill="#f4f6fc" stroke="#141420" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>
+      <rect x="41" y="9" width="9.5" height="29" rx="4.8" fill="#f4f6fc" stroke="#141420" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>
+      <rect x="50" y="17" width="8.5" height="22" rx="4.2" fill="#f4f6fc" stroke="#141420" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>
+      <rect x="7" y="30" width="10" height="24" rx="5" fill="#f4f6fc" stroke="#141420" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" transform="rotate(-38 12 42)"/>
+      <path d="M20 31 H58 V45 Q58 59 41 59 H33 Q19 59 19 46 Z" fill="#f4f6fc" stroke="#141420" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>
+      <path d="M30 47 Q38 51 47 47" fill="none" stroke="#9aa3c7" stroke-width="3" stroke-linecap="round"/>
+      <path d="M24 34 V42" stroke="#ffffff" stroke-width="3" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="i-matar" viewBox="0 0 64 64">
+      <path d="M19 41 L49 9 Q55 5 59 5 Q59 10 55 15 L24 46 Z" fill="#e6ecf5" stroke="#141420" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>
+      <path d="M27 38 L50 14" stroke="#ffffff" stroke-width="3" stroke-linecap="round"/>
+      <line x1="8" y1="57" x2="19" y2="46" stroke="#141420" stroke-width="13" stroke-linecap="round"/>
+      <line x1="8" y1="57" x2="19" y2="46" stroke="#a3302a" stroke-width="6" stroke-linecap="round"/>
+      <line x1="13" y1="38" x2="27" y2="52" stroke="#141420" stroke-width="10" stroke-linecap="round"/>
+      <line x1="13" y1="38" x2="27" y2="52" stroke="#d9a63a" stroke-width="4" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="i-reportar" viewBox="0 0 64 64">
+      <path d="M21 52 L26 40 L32 42 L28 56 Z" fill="#8a3a10" stroke="#141420" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>
+      <rect x="6" y="23" width="12" height="18" rx="4" fill="#c4601a" stroke="#141420" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>
+      <path d="M17 25 L42 11 L42 53 L17 39 Z" fill="#ff9a3c" stroke="#141420" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>
+      <ellipse cx="42" cy="32" rx="5" ry="21" fill="#ffd2a1" stroke="#141420" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>
+      <path d="M22 28 L36 20" stroke="#ffd2a1" stroke-width="3" stroke-linecap="round"/>
+      <path d="M51 23 Q55 32 51 41 M56 16 Q63 32 56 48" fill="none" stroke="#141420" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="i-sabotear" viewBox="0 0 64 64">
+      <path d="M32 5 Q35 5 37 9 L60 52 Q61 58 55 58 H9 Q3 58 4 52 L27 9 Q29 5 32 5 Z" fill="#e8263b" stroke="#141420" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>
+      <path d="M36 15 L23 37 H32 L27 52 L43 29 H34 L39 15 Z" fill="#ffd34d" stroke="#141420" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="i-ventila" viewBox="0 0 64 64">
+      <rect x="6" y="13" width="52" height="38" rx="7" fill="#8b93a8" stroke="#141420" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>
+      <rect x="12" y="19" width="40" height="26" rx="3" fill="#3a3f4f" stroke="#141420" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>
+      <path d="M13 26 H51 M13 32 H51 M13 38 H51" stroke="#b9c0d3" stroke-width="3.5" stroke-linecap="round"/>
+      <circle cx="10" cy="17" r="1.6" fill="#141420"/><circle cx="54" cy="17" r="1.6" fill="#141420"/>
+      <circle cx="10" cy="47" r="1.6" fill="#141420"/><circle cx="54" cy="47" r="1.6" fill="#141420"/>
+    </symbol>
+    <symbol id="i-otra" viewBox="0 0 64 64">
+      <path d="M12 50 Q10 20 40 20" fill="none" stroke="#141420" stroke-width="14" stroke-linecap="round"/>
+      <path d="M12 50 Q10 20 40 20" fill="none" stroke="#ffcc33" stroke-width="6" stroke-linecap="round"/>
+      <path d="M37 6 L58 20 L37 34 Z" fill="#ffcc33" stroke="#141420" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>
+    </symbol>
+  </svg>
+
   <canvas id="lienzo"></canvas>
 
   <!-- Pantalla de inicio -->
   <section id="inicio" class="pantalla">
     <div class="tarjeta">
-      <h1 class="logo">AMOGOS</h1>
+      <h1 class="logo" aria-label="AMOGOS"><span style="--i:0">A</span><span style="--i:1">M</span><span style="--i:2">O</span><span style="--i:3">G</span><span style="--i:4">O</span><span style="--i:5">S</span></h1>
       <p class="sub">¿Quién es el impostor?</p>
       <label class="campo">
         <span>Tu nombre</span>
@@ -42,15 +90,15 @@
   <!-- Interfaz durante el juego -->
   <section id="hud" class="oculto">
     <div class="hud-arriba-izq">
-      <button id="btnSalir" class="btn-icono" aria-label="Salir">✕</button>
+      <button id="btnSalir" class="btn-icono" aria-label="Salir"><svg class="icono" aria-hidden="true"><use href="#ic-cerrar"/></svg></button>
       <div id="infoSala" class="chip"></div>
       <div id="infoRol" class="chip oculto"></div>
     </div>
     <div class="hud-arriba-der">
       <div id="avisoConexion" class="chip chip-alerta oculto">Reconectando…</div>
       <div id="infoJugadores" class="chip"></div>
-      <button id="btnSonido" class="btn-icono" aria-label="Sonido">🔊</button>
-      <button id="btnChat" class="btn-icono oculto" aria-label="Chat">💬<span id="chatNuevo" class="punto oculto"></span></button>
+      <button id="btnSonido" class="btn-icono" aria-label="Sonido"><svg class="icono" aria-hidden="true"><use href="#ic-sonido"/></svg></button>
+      <button id="btnChat" class="btn-icono oculto" aria-label="Chat"><svg class="icono" aria-hidden="true"><use href="#ic-chat"/></svg><span id="chatNuevo" class="punto oculto"></span></button>
     </div>
 
     <div id="panelLobby" class="panel-lobby oculto">
@@ -68,23 +116,24 @@
       <div id="alertaSabotaje" class="alerta-sabotaje oculto"></div>
     </div>
     <div id="listaTareas" class="lista-tareas oculto">
-      <button id="btnListaTareas" class="lista-cabeza">Tareas ▾</button>
+      <button id="btnListaTareas" class="lista-cabeza">Tareas <svg class="icono" aria-hidden="true"><use href="#ic-triangulo"/></svg></button>
       <p id="pista" class="pista"></p>
       <ul id="tareasUl"></ul>
     </div>
     <div id="flash" class="flash-rojo oculto"></div>
+    <button id="minimapa" class="minimapa oculto" aria-label="Abrir mapa"><canvas id="minimapaLienzo" width="300" height="190"></canvas><span class="minimapa-etiqueta">MAPA</span></button>
     <div id="menuSabotaje" class="menu-sabotaje oculto">
-      <button id="btnSabLuces" class="btn btn-chico">💡 Apagar luces</button>
-      <button id="btnSabReactor" class="btn btn-chico">☢️ Reactor</button>
+      <button id="btnSabLuces" class="btn btn-chico btn-con-icono"><svg class="icono" aria-hidden="true"><use href="#ic-foco"/></svg><span>Apagar luces</span></button>
+      <button id="btnSabReactor" class="btn btn-chico btn-con-icono"><svg class="icono" aria-hidden="true"><use href="#ic-reactor"/></svg><span>Reactor</span></button>
     </div>
 
     <div class="botones-accion">
-      <button id="btnVentSig" class="btn-accion btn-vent oculto">➜<br>OTRA</button>
-      <button id="btnVentila" class="btn-accion btn-vent oculto" disabled>VENTILA</button>
-      <button id="btnSabotear" class="btn-accion btn-sabotear oculto">SABOTEAR<span id="sabCd" class="cd"></span></button>
-      <button id="btnReportar" class="btn-accion btn-reportar oculto" disabled>REPORTAR</button>
-      <button id="btnMatar" class="btn-accion btn-matar oculto" disabled>MATAR<span id="matarCd" class="cd"></span></button>
-      <button id="btnUsar" class="btn-accion" disabled>USAR</button>
+      <button id="btnVentSig" class="btn-accion btn-vent oculto"><svg class="ico"><use href="#i-otra"/></svg><span class="etq">OTRA</span></button>
+      <button id="btnVentila" class="btn-accion btn-vent oculto" disabled><svg class="ico"><use href="#i-ventila"/></svg><span class="etq">VENTILA</span></button>
+      <button id="btnSabotear" class="btn-accion btn-sabotear oculto"><svg class="ico"><use href="#i-sabotear"/></svg><span class="etq">SABOTEAR</span><span id="sabCd" class="cd"></span></button>
+      <button id="btnReportar" class="btn-accion btn-reportar oculto" disabled><svg class="ico"><use href="#i-reportar"/></svg><span class="etq">REPORTAR</span></button>
+      <button id="btnMatar" class="btn-accion btn-matar oculto" disabled><svg class="ico"><use href="#i-matar"/></svg><span class="etq">MATAR</span><span id="matarCd" class="cd"></span></button>
+      <button id="btnUsar" class="btn-accion btn-usar" disabled><svg class="ico"><use href="#i-usar"/></svg><span class="etq">USAR</span></button>
     </div>
   </section>
 
@@ -93,7 +142,7 @@
     <div id="chat" class="chat">
       <div class="chat-cabeza">
         <span id="chatTitulo">Chat</span>
-        <button id="btnCerrarChat" class="btn-icono btn-icono-chico" aria-label="Cerrar chat">✕</button>
+        <button id="btnCerrarChat" class="btn-icono btn-icono-chico" aria-label="Cerrar chat"><svg class="icono" aria-hidden="true"><use href="#ic-cerrar"/></svg></button>
       </div>
       <div id="chatMensajes" class="chat-mensajes" aria-live="polite"></div>
       <form id="chatForm" class="chat-form" autocomplete="off">
@@ -101,6 +150,21 @@
         <button class="btn btn-chico" type="submit">Enviar</button>
       </form>
     </div>
+  </section>
+
+  <!-- Mapa grande: no bloquea el joystick, solo el botón de cerrar recibe toques -->
+  <section id="mapaGrande" class="mapa-grande oculto">
+    <div class="mapa-marco">
+      <div class="mapa-cabeza"><span id="mapaTitulo"></span><button id="btnCerrarMapa" class="btn-icono btn-icono-chico" aria-label="Cerrar mapa"><svg class="icono" aria-hidden="true"><use href="#ic-cerrar"/></svg></button></div>
+      <canvas id="mapaGrandeLienzo" width="900" height="560"></canvas>
+      <div class="mapa-leyenda"><span><i class="ley-yo"></i>Tú</span><span><i class="ley-tarea"></i>Tus tareas</span><span><i class="ley-emerg"></i>Emergencia</span><span id="leyVent" class="oculto"><i class="ley-vent"></i>Ventilas</span><span id="leySab" class="oculto"><i class="ley-sab"></i>Sabotaje</span></div>
+    </div>
+  </section>
+
+  <!-- Aviso grande al empezar una reunión -->
+  <section id="avisoReunion" class="aviso-reunion oculto">
+    <div class="aviso-rayos"></div>
+    <p id="avisoReunionTexto" class="aviso-texto"></p>
   </section>
 
   <!-- Reunión -->
@@ -126,6 +190,7 @@
     <p id="expulsionSub" class="cartel-sub"></p>
   </section>
   <section id="fin" class="cartel oculto">
+    <div id="confeti" class="confeti"></div>
     <p id="finTitulo" class="cartel-titulo"></p>
     <p id="finSub" class="cartel-sub"></p>
     <canvas id="finLienzo" width="560" height="140"></canvas>
@@ -150,7 +215,7 @@
     <div class="tarjeta tarjeta-tarea">
       <div class="tarea-cabeza">
         <h2 id="tareaTitulo"></h2>
-        <button id="btnCerrarTarea" class="btn-icono btn-icono-chico" aria-label="Cerrar tarea">✕</button>
+        <button id="btnCerrarTarea" class="btn-icono btn-icono-chico" aria-label="Cerrar tarea"><svg class="icono" aria-hidden="true"><use href="#ic-cerrar"/></svg></button>
       </div>
       <div id="tareaContenido" class="tarea-contenido"></div>
     </div>
@@ -178,12 +243,13 @@
 
   <!-- Aviso para girar el celular -->
   <div id="girar" class="girar">
-    <div class="girar-icono">📱↻</div>
+    <div class="girar-icono"><svg class="icono" aria-hidden="true"><use href="#ic-girar"/></svg></div>
     <p>Gira tu celular para jugar</p>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
   <script src="/shared/game.js"></script>
+  <script src="js/icons.js"></script>
   <script src="js/audio.js"></script>
   <script src="js/input.js"></script>
   <script src="js/render.js"></script>

@@ -19,7 +19,10 @@ const CHAT_MIN_INTERVAL_MS = 700;
 const CHAT_HISTORY = 60;
 
 const app = express();
-app.use(express.static(path.join(__dirname, '..', 'public')));
+app.use(express.static(path.join(__dirname, '..', 'public'), {
+  // Las fuentes no cambian: que el celular las guarde un año. El resto se revalida (así un deploy nuevo se ve al instante).
+  setHeaders: (res, file) => { if (file.endsWith('.woff2')) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable'); },
+}));
 app.use('/shared', express.static(path.join(__dirname, '..', 'shared')));
 app.get('/salud', (_req, res) => res.send('ok'));
 
@@ -84,7 +87,7 @@ function stateFor(room, viewer) {
       alive: viewer.alive,
       killIn: viewer.role === 'impostor' ? Math.max(0, viewer.killReadyAt - now) : null,
       emergencies: viewer.emergenciesLeft,
-      tasks: (viewer.tasks || []).map((k) => ({ id: k.id, done: k.done })),
+      tasks: (viewer.tasks || []).map((k) => ({ id: k.id, done: k.done, step: k.step, steps: k.steps.length, station: k.steps[Math.min(k.step, k.steps.length - 1)] })),
       inVent: viewer.inVent || null,
       sabotageIn: viewer.role === 'impostor' ? Math.max(0, room.sabotageReadyAt - now) : null,
     };
@@ -233,18 +236,18 @@ function taskProgress(room) {
   let done = 0, total = 0;
   for (const p of room.players.values()) {
     if (p.role !== 'tripulante') continue;
-    for (const k of p.tasks) { total++; if (k.done) done++; }
+    for (const k of p.tasks) { total += k.steps.length; done += k.step; } // cada etapa cuenta
   }
   return { done, total };
 }
 
 function assignTasks(room, p) {
-  const all = (S.MAPS[room.map].tasks || []).map((k) => k.id);
+  const all = S.taskPool(S.MAPS[room.map]);
   for (let i = all.length - 1; i > 0; i--) {
     const j = crypto.randomInt(i + 1);
     [all[i], all[j]] = [all[j], all[i]];
   }
-  p.tasks = all.slice(0, room.settings.tasks).map((id) => ({ id, done: false }));
+  p.tasks = all.slice(0, room.settings.tasks).map((t) => ({ id: t.id, steps: t.steps, step: 0, done: false }));
   p.taskOpen = null;
 }
 
@@ -666,9 +669,9 @@ io.on('connection', (socket) => {
     const { room, p } = current(socket);
     if (!room || room.phase !== 'juego' || p.inVent) return;
     const k = p.tasks.find((q) => q.id === id && !q.done);
-    const st = (S.MAPS[room.map].tasks || []).find((q) => q.id === id);
+    const st = k && (S.MAPS[room.map].tasks || []).find((q) => q.id === k.steps[k.step]);
     if (!k || !st || !near(p, st, S.USE_RANGE)) return;
-    p.taskOpen = { id, at: Date.now() };
+    p.taskOpen = { id, step: k.step, at: Date.now() };
   });
 
   socket.on('tarea', (id) => {
@@ -676,9 +679,10 @@ io.on('connection', (socket) => {
     if (!room || room.phase !== 'juego' || p.role !== 'tripulante') return;
     if (!p.taskOpen || p.taskOpen.id !== id || Date.now() - p.taskOpen.at < 700) return;
     const k = p.tasks.find((q) => q.id === id && !q.done);
-    const st = (S.MAPS[room.map].tasks || []).find((q) => q.id === id);
-    if (!k || !near(p, st, S.USE_RANGE)) return;
-    k.done = true;
+    const st = k && (S.MAPS[room.map].tasks || []).find((q) => q.id === k.steps[k.step]);
+    if (!k || !st || p.taskOpen.step !== k.step || !near(p, st, S.USE_RANGE)) return;
+    k.step++; // siguiente etapa (en otra sala) o tarea terminada
+    k.done = k.step >= k.steps.length;
     p.taskOpen = null;
     if (checkWin(room)) return;
     sendRoom(room);

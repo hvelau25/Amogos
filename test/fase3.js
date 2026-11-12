@@ -80,7 +80,8 @@ async function newGame(tasks) {
   // ---- Partida 1: tareas, ventilaciones, luces, victoria por tareas ----
   let { bots, imp, crew } = await newGame(2);
   ok(crew.every((b) => b.sala.me.tasks.length === 2) && imp.sala.me.tasks.length === 2, 'cada uno tiene 2 tareas (el impostor, falsas)');
-  ok(crew[0].sala.taskProgress.total === 4 && crew[0].sala.taskProgress.done === 0, 'barra de progreso: 0/4 (no cuenta las del impostor)');
+  const expected = crew.reduce((n, c) => n + c.sala.me.tasks.reduce((m, k) => m + k.steps, 0), 0);
+  ok(crew[0].sala.taskProgress.total === expected && crew[0].sala.taskProgress.done === 0, 'barra de progreso: 0/' + expected + ' (cuenta etapas, no las del impostor)');
 
   // tarea sin abrirla o desde lejos → rechazada
   const t0 = crew[0].sala.me.tasks[0].id;
@@ -111,17 +112,26 @@ async function newGame(tasks) {
   crew[1].s.emit('arreglarLuces'); await wait(200);
   ok(!crew[0].sala.sabotage, 'un tripulante arregla las luces en Eléctrica');
 
-  // hacer todas las tareas
+  // hacer todas las tareas (las de varias etapas, una sala tras otra)
+  let multi = false;
   for (const c of crew) {
-    for (const k of c.sala.me.tasks) {
-      const st = MAP.tasks.find((q) => q.id === k.id);
-      await walkTo(c, ...at(st));
-      c.s.emit('abrirTarea', k.id);
-      await wait(800);
-      c.s.emit('tarea', k.id);
-      await wait(200);
+    for (const k0 of c.sala.me.tasks) {
+      for (let guard = 0; guard < 4; guard++) {
+        const k = c.sala.me.tasks.find((q) => q.id === k0.id);
+        if (k.done) break;
+        if (k.steps > 1) multi = true;
+        const st = MAP.tasks.find((q) => q.id === k.station);
+        await walkTo(c, ...at(st));
+        c.s.emit('abrirTarea', k.id);
+        await wait(800);
+        c.s.emit('tarea', k.id);
+        await wait(200);
+        const k2 = c.sala.me.tasks.find((q) => q.id === k0.id);
+        ok(k2.step === k.step + 1, 'etapa ' + (k.step + 1) + '/' + k.steps + ' de ' + k.id + ' completada');
+      }
     }
   }
+  if (!multi) console.log('  (esta vez no tocó ninguna tarea de varias etapas)');
   await until(() => crew[0].sala.phase === 'fin', 5000, 'fin por tareas');
   ok(crew[0].sala.ending.winner === 'tripulantes' && /tareas/.test(crew[0].sala.ending.reason), 'ganan los tripulantes por tareas');
   bots.forEach((b) => b.s.disconnect());

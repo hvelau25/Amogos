@@ -103,11 +103,16 @@ window.Render = (function () {
     return i >= 0 ? map.rooms[i].floor : map.corridorFloor || '#565d6e';
   }
 
+  const shadeMemo = new Map(); // se llama por cada casilla en cada cuadro: guardar el resultado evita crear miles de textos
   function shade(hex, amt) {
+    const key = hex + amt;
+    let v = shadeMemo.get(key);
+    if (v) return v;
     const n = parseInt(hex.slice(1), 16);
-    const f = (v) => Math.max(0, Math.min(255, Math.round(v + amt)));
-    const r = f(n >> 16), g = f((n >> 8) & 255), b = f(n & 255);
-    return `rgb(${r},${g},${b})`;
+    const f = (x) => Math.max(0, Math.min(255, Math.round(x + amt)));
+    v = `rgb(${f(n >> 16)},${f((n >> 8) & 255)},${f(n & 255)})`;
+    shadeMemo.set(key, v);
+    return v;
   }
 
   function drawMap(map, x0, y0, x1, y1) {
@@ -275,12 +280,17 @@ window.Render = (function () {
     }
   }
 
-  function drawDecor(map) {
+  // v = rectángulo visible en unidades de mundo (con margen): lo de afuera no se dibuja.
+  const inView = (v, x, y) => !v || (x >= v.x0 && x <= v.x1 && y >= v.y0 && y <= v.y1);
+  function drawDecor(map, v) {
     const now = performance.now() / 1000;
-    for (const d of map.decor || []) drawItem(d, now);
+    for (const d of map.decor || []) if (inView(v, d.x * T, d.y * T)) drawItem(d, now);
     // Botón de emergencia (sobre la mesa central)
     if (map.emergency) {
       const ex = map.emergency.x * T, ey = map.emergency.y * T;
+      const pr = (now * 0.7) % 1;
+      ctx.strokeStyle = `rgba(255,60,80,${0.5 * (1 - pr)})`; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.ellipse(ex, ey, 22 + pr * 26, 14 + pr * 17, 0, 0, Math.PI * 2); ctx.stroke();
       ctx.fillStyle = '#9aa3ad'; ctx.strokeStyle = OUTLINE; ctx.lineWidth = 3;
       ctx.beginPath(); ctx.ellipse(ex, ey, 20, 13, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
       ctx.fillStyle = '#e8263b';
@@ -294,15 +304,46 @@ window.Render = (function () {
     }
   }
 
+  // El texto de cada sala no cambia nunca: se dibuja una vez en una imagen y luego solo se pega.
+  // (Si la fuente aún no cargó, se dibuja directo; al cargar se vacía la caché para rehacerla.)
+  const labelCache = new Map();
+  // ¿La fuente de los títulos ya está lista? (si aún se descarga, no guardar nada: se guardaría con la letra equivocada)
+  const fontOk = () => !document.fonts || document.fonts.check('30px "Luckiest Guy"');
+  const LABEL_FONT = (px) => `${px}px "Luckiest Guy", system-ui, sans-serif`;
+  function roomLabelImg(map, r) {
+    const key = map.id + ':' + r.id;
+    let c = labelCache.get(key);
+    if (c) return c;
+    if (!fontOk()) return null;
+    const K = 2, text = r.name.toUpperCase();
+    const g0 = document.createElement('canvas').getContext('2d');
+    g0.font = LABEL_FONT(30 * K);
+    const w = Math.ceil(g0.measureText(text).width) + 24 * K, h = 56 * K;
+    c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const g = c.getContext('2d');
+    g.font = LABEL_FONT(30 * K); g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round';
+    g.lineWidth = 6 * K; g.strokeStyle = 'rgba(0,0,0,0.16)'; g.strokeText(text, w / 2, h / 2 + 3 * K);
+    g.fillStyle = 'rgba(255,255,255,0.22)'; g.fillText(text, w / 2, h / 2);
+    c._w = w / K; c._h = h / K;
+    labelCache.set(key, c);
+    return c;
+  }
+
   function drawRoomLabels(map, x0, y0, x1, y1) {
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.font = 'bold 30px system-ui, sans-serif';
     for (const r of map.rooms) {
       if (r.label === false || !r.name) continue;
       if (r.x + r.w < x0 || r.x > x1 || r.y + r.h < y0 || r.y > y1) continue;
-      ctx.fillStyle = 'rgba(255,255,255,0.18)';
-      ctx.fillText(r.name.toUpperCase(), (r.x + r.w / 2) * T, (r.y + 0.7) * T);
+      const lx = (r.x + r.w / 2) * T, ly = (r.y + 0.75) * T;
+      const img = roomLabelImg(map, r);
+      if (img) { ctx.drawImage(img, lx - img._w / 2, ly - img._h / 2, img._w, img._h); continue; }
+      const label = r.name.toUpperCase();
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = LABEL_FONT(30);
+      ctx.lineWidth = 6; ctx.strokeStyle = 'rgba(0,0,0,0.16)'; ctx.lineJoin = 'round';
+      ctx.strokeText(label, lx, ly + 3);
+      ctx.lineJoin = 'miter';
+      ctx.fillStyle = 'rgba(255,255,255,0.22)';
+      ctx.fillText(label, lx, ly);
     }
   }
 
@@ -405,34 +446,303 @@ window.Render = (function () {
     ctx.font = 'bold 18px system-ui, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
-    const label = (isHost ? '★ ' : '') + name + (disconnected ? ' (…)' : '');
-    ctx.lineWidth = 4;
+    const label = name + (disconnected ? ' (…)' : '');
+    const ny = y - S.PLAYER_RADIUS * 2.0;
+    ctx.lineWidth = 4; ctx.lineJoin = 'round';
     ctx.strokeStyle = 'rgba(0,0,0,0.75)';
-    ctx.strokeText(label, x, y - S.PLAYER_RADIUS * 2.0);
+    ctx.strokeText(label, x, ny);
     ctx.fillStyle = disconnected ? '#9aa3c7' : color || '#ffffff';
-    ctx.fillText(label, x, y - S.PLAYER_RADIUS * 2.0);
+    ctx.fillText(label, x, ny);
+    ctx.lineJoin = 'miter';
+    if (isHost) { // estrella propia junto al nombre del host
+      const w = ctx.measureText(label).width, im = window.Icons && Icons.img('estrella');
+      if (im && im.complete) ctx.drawImage(im, x - w / 2 - 24, ny - 21, 20, 20);
+    }
   }
 
   function drawJoystick() {
     const j = Input.joystick;
     if (!j.active) return;
-    ctx.fillStyle = 'rgba(255,255,255,0.12)';
-    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+    const bg = ctx.createRadialGradient(j.baseX, j.baseY, Input.RADIUS * 0.3, j.baseX, j.baseY, Input.RADIUS);
+    bg.addColorStop(0, 'rgba(255,255,255,0.04)');
+    bg.addColorStop(1, 'rgba(255,255,255,0.16)');
+    ctx.fillStyle = bg;
+    ctx.strokeStyle = 'rgba(255,255,255,0.45)';
     ctx.lineWidth = 3;
     ctx.beginPath(); ctx.arc(j.baseX, j.baseY, Input.RADIUS, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     let kx = j.knobX - j.baseX, ky = j.knobY - j.baseY;
     const d = Math.hypot(kx, ky);
     if (d > Input.RADIUS) { kx = (kx / d) * Input.RADIUS; ky = (ky / d) * Input.RADIUS; }
-    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    if (d > 8) {
+      const a = Math.atan2(ky, kx);
+      ctx.strokeStyle = 'rgba(255,204,51,0.8)'; ctx.lineWidth = 5;
+      ctx.beginPath(); ctx.arc(j.baseX, j.baseY, Input.RADIUS - 2, a - 0.45, a + 0.45); ctx.stroke();
+    }
+    const kg = ctx.createRadialGradient(j.baseX + kx - 8, j.baseY + ky - 8, 4, j.baseX + kx, j.baseY + ky, 28);
+    kg.addColorStop(0, 'rgba(255,255,255,0.85)');
+    kg.addColorStop(1, 'rgba(200,210,240,0.5)');
+    ctx.fillStyle = kg;
     ctx.beginPath(); ctx.arc(j.baseX + kx, j.baseY + ky, 28, 0, Math.PI * 2); ctx.fill();
   }
 
+  // ---------- Partículas (polvo al caminar, destellos, salpicaduras) ----------
+  const parts = [];
+  const lastDust = new Map();
+  function burst(x, y, kind, color) {
+    const n = { dust: 3, sparkle: 26, splat: 22, puff: 16, confetti: 0 }[kind] || 8;
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2;
+      let sp = 0, life = 0.6, r = 4;
+      if (kind === 'dust') { sp = 20 + Math.random() * 30; life = 0.45 + Math.random() * 0.2; r = 4 + Math.random() * 4; }
+      if (kind === 'sparkle') { sp = 120 + Math.random() * 220; life = 0.7 + Math.random() * 0.5; r = 3 + Math.random() * 4; }
+      if (kind === 'splat') { sp = 80 + Math.random() * 260; life = 0.5 + Math.random() * 0.5; r = 4 + Math.random() * 6; }
+      if (kind === 'puff') { sp = 40 + Math.random() * 120; life = 0.6 + Math.random() * 0.4; r = 10 + Math.random() * 10; }
+      parts.push({ kind, x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp * (kind === 'dust' ? 0.4 : 1) - (kind === 'dust' ? 8 : 0),
+        life, max: life, r, color: color || null, rot: Math.random() * 6 });
+    }
+    if (parts.length > 400) parts.splice(0, parts.length - 400);
+  }
+  function stepParts(dt) {
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const p = parts[i];
+      p.life -= dt;
+      if (p.life <= 0) { parts.splice(i, 1); continue; }
+      const drag = p.kind === 'sparkle' ? 2.6 : p.kind === 'splat' ? 5 : 3;
+      p.vx -= p.vx * Math.min(1, drag * dt);
+      p.vy -= p.vy * Math.min(1, drag * dt);
+      if (p.kind === 'sparkle') p.vy += 60 * dt;
+      p.x += p.vx * dt; p.y += p.vy * dt; p.rot += dt * 6;
+    }
+  }
+  function drawParts(layer) {
+    for (const p of parts) {
+      const k = p.life / p.max;
+      if (layer === 'low' && (p.kind !== 'dust' && p.kind !== 'splat')) continue;
+      if (layer === 'high' && (p.kind === 'dust' || p.kind === 'splat')) continue;
+      if (p.kind === 'dust') {
+        ctx.globalAlpha = k * 0.35; ctx.fillStyle = '#e6ecff';
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r * (1.6 - k * 0.6), 0, Math.PI * 2); ctx.fill();
+      } else if (p.kind === 'sparkle') {
+        ctx.globalAlpha = Math.min(1, k * 1.6); ctx.fillStyle = p.color || '#ffe27a';
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+        const s = p.r * (0.6 + k);
+        ctx.beginPath(); ctx.moveTo(0, -s * 2); ctx.lineTo(s * 0.5, 0); ctx.lineTo(0, s * 2); ctx.lineTo(-s * 0.5, 0); ctx.closePath(); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(-s * 2, 0); ctx.lineTo(0, s * 0.5); ctx.lineTo(s * 2, 0); ctx.lineTo(0, -s * 0.5); ctx.closePath(); ctx.fill();
+        ctx.restore();
+      } else if (p.kind === 'splat') {
+        ctx.globalAlpha = Math.min(1, k * 2); ctx.fillStyle = p.color || '#b0102a';
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r * (0.5 + k * 0.5), 0, Math.PI * 2); ctx.fill();
+      } else if (p.kind === 'puff') {
+        ctx.globalAlpha = k * 0.55; ctx.fillStyle = p.color || '#8b93a8';
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r * (1.8 - k), 0, Math.PI * 2); ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // Luz suave de cada sala visible (da volumen al piso).
+  const lightCache = new Map(); // un degradado por sala (se crea una vez; la pulsación va en globalAlpha)
+  function drawRoomLights(map, x0, y0, x1, y1, t) {
+    for (const r of map.rooms) {
+      if (r.x + r.w < x0 || r.x > x1 || r.y + r.h < y0 || r.y > y1) continue;
+      const key = map.id + ':' + r.id;
+      let g = lightCache.get(key);
+      if (!g) {
+        const cx = (r.x + r.w / 2) * T, cy = (r.y + r.h / 2) * T;
+        const rad = Math.max(r.w, r.h) * T * 0.62;
+        g = ctx.createRadialGradient(cx, cy, 0, cx, cy, rad);
+        g.addColorStop(0, map.theme === 'ice' ? 'rgb(200,240,255)' : 'rgb(255,240,200)');
+        g.addColorStop(1, 'rgba(0,0,0,0)');
+        lightCache.set(key, g);
+      }
+      ctx.globalAlpha = 0.13 + Math.sin(t * 0.8 + r.x) * 0.02;
+      ctx.fillStyle = g;
+      ctx.fillRect(r.x * T, r.y * T, r.w * T, r.h * T);
+      ctx.globalAlpha = 1;
+      // Sombra interior en las orillas de la sala
+      ctx.strokeStyle = 'rgba(0,0,0,0.18)'; ctx.lineWidth = 14;
+      ctx.strokeRect(r.x * T + 7, r.y * T + 7, r.w * T - 14, r.h * T - 14);
+    }
+  }
+
+  // Detalles en las paredes: ventanas con estrellas (estación), carámbanos (hielo) y foquitos.
+  function drawWallDetails(map, x0, y0, x1, y1, t) {
+    const solid = (tx, ty) => S.isSolidTile(map, tx, ty);
+    for (let ty = y0; ty <= y1; ty++)
+      for (let tx = x0; tx <= x1; tx++) {
+        if (!solid(tx, ty) || solid(tx, ty + 1)) continue;
+        const h = ((tx * 92837111) ^ (ty * 689287499)) >>> 0;
+        const px = tx * T, py = ty * T;
+        if (map.theme === 'ice') {
+          ctx.fillStyle = 'rgba(220,245,255,0.9)'; ctx.strokeStyle = OUTLINE; ctx.lineWidth = 2;
+          const n = 2 + (h % 3);
+          for (let i = 0; i < n; i++) {
+            const ix = px + 8 + ((h >> (i * 3)) % 48), len = 8 + ((h >> (i * 4 + 2)) % 14);
+            ctx.beginPath(); ctx.moveTo(ix - 5, py + T); ctx.lineTo(ix + 5, py + T); ctx.lineTo(ix, py + T + len); ctx.closePath(); ctx.fill(); ctx.stroke();
+          }
+          if (h % 9 === 0) {
+            ctx.fillStyle = `rgba(120,220,255,${0.5 + Math.sin(t * 2 + tx) * 0.3})`;
+            ctx.beginPath(); ctx.arc(px + T / 2, py + T * 0.6, 5, 0, Math.PI * 2); ctx.fill();
+          }
+        } else if (h % 5 === 0) {
+          // Ventana redonda al espacio
+          const cx = px + T / 2, cy = py + T * 0.66, rr = 13;
+          ctx.fillStyle = '#060a18'; ctx.strokeStyle = '#8d97b3'; ctx.lineWidth = 4;
+          ctx.beginPath(); ctx.arc(cx, cy, rr, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+          ctx.fillStyle = '#ffffff';
+          for (let i = 0; i < 3; i++) {
+            const sx = cx - 7 + ((h >> (i * 5)) % 14), sy = cy - 6 + ((h >> (i * 5 + 3)) % 12);
+            ctx.globalAlpha = 0.5 + 0.5 * Math.abs(Math.sin(t * 1.5 + i + tx));
+            ctx.fillRect(sx, sy, 2, 2);
+          }
+          ctx.globalAlpha = 1;
+          ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.arc(cx, cy, rr - 5, -2.6, -1.6); ctx.stroke();
+        } else if (h % 7 === 2) {
+          // Foquito que parpadea
+          const on = Math.sin(t * 3 + h) > -0.3;
+          ctx.fillStyle = on ? (h % 2 ? '#5fe08a' : '#ffcc33') : '#3a4054';
+          ctx.beginPath(); ctx.arc(px + T / 2, py + T * 0.62, 4, 0, Math.PI * 2); ctx.fill();
+          if (on) { ctx.globalAlpha = 0.25; ctx.beginPath(); ctx.arc(px + T / 2, py + T * 0.62, 10, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1; }
+        } else if (h % 7 === 4) {
+          // Tubo
+          ctx.fillStyle = '#6b7592'; ctx.fillRect(px, py + T * 0.5, T + 0.5, 7);
+          ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fillRect(px, py + T * 0.5, T + 0.5, 2);
+        }
+      }
+  }
+
+  // Pantalla de inicio: tripulantes flotando por el espacio.
+  const floaters = [];
+  function drawMenu(t, dt) {
+    if (!floaters.length)
+      for (let i = 0; i < 7; i++)
+        floaters.push({ x: Math.random() * cssW, y: Math.random() * cssH, vx: (Math.random() < 0.5 ? -1 : 1) * (18 + Math.random() * 26),
+          vy: (Math.random() - 0.5) * 14, rot: Math.random() * 6, vr: (Math.random() - 0.5) * 0.9, s: 0.7 + Math.random() * 0.8, c: i * 2 % 12 });
+    for (const f of floaters) {
+      f.x += f.vx * dt; f.y += f.vy * dt; f.rot += f.vr * dt;
+      if (f.x < -80) f.x = cssW + 70; if (f.x > cssW + 80) f.x = -70;
+      if (f.y < -80) f.y = cssH + 70; if (f.y > cssH + 80) f.y = -70;
+      ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(f.rot); ctx.scale(f.s, f.s);
+      drawCrew(0, 0, f.c, f.vx < 0 ? -1 : 1, false, t + f.c, 0.85);
+      ctx.restore();
+    }
+  }
+
+  // ---------- Minimapa ----------
+  const miniCache = new Map();
+  function miniBase(map, w, h, dp, labels) {
+    labels = labels && fontOk(); // sin la fuente lista, el mapa sale sin nombres un instante y se rehace después
+    const key = map.id + ':' + w + 'x' + h + ':' + dp + (labels ? ':L' : '');
+    let c = miniCache.get(key);
+    if (c) return c;
+    c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const g = c.getContext('2d');
+    const k = Math.min(w / map.width, h / map.height);
+    const ox = (w - map.width * k) / 2, oy = (h - map.height * k) / 2;
+    // Salas y pasillos como figuras (no casilla por casilla): primero el contorno, luego el relleno.
+    const R = (r, pad) => [ox + r.x * k - pad, oy + r.y * k - pad, r.w * k + pad * 2, r.h * k + pad * 2];
+    const lw = Math.max(2, k * 0.28);
+    const rad = (r) => Math.min(k * 0.9, r.w * k / 3, r.h * k / 3);
+    const shape = (r, pad, fill) => {
+      const [x, y, ww, hh] = R(r, pad);
+      g.fillStyle = fill;
+      g.beginPath();
+      if (g.roundRect) g.roundRect(x, y, ww, hh, rad(r) + pad * 0.5); else g.rect(x, y, ww, hh);
+      g.fill();
+    };
+    for (const r of map.corridors) shape(r, lw, '#e8ecff');
+    for (const r of map.rooms) shape(r, lw, '#e8ecff');
+    for (const r of map.corridors) shape(r, 0, '#2b3146');
+    for (const r of map.rooms) {
+      shape(r, 0, shade(r.floor, -38));
+      // brillo suave arriba de cada sala
+      const [x, y, ww] = R(r, 0);
+      g.fillStyle = 'rgba(255,255,255,0.08)';
+      g.fillRect(x + lw, y + lw, ww - lw * 2, Math.max(2, k * 0.6));
+    }
+    if (labels) { // los nombres no cambian: van dentro de la imagen guardada
+      const u = 0.8 * dp * Math.sqrt(w / dp / 150);
+      g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round';
+      for (const r of map.rooms) {
+        if (!r.name || r.label === false) continue;
+        const lx = ox + (r.x + r.w / 2) * k, ly = oy + (r.y + r.h - Math.min(0.9, r.h * 0.25)) * k; // abajo: arriba están las consolas
+        const fs = Math.max(9 * dp, Math.min(7 * u, (r.w * k * 1.9) / r.name.length));
+        g.font = LABEL_FONT(Math.round(fs));
+        g.lineWidth = 3 * u; g.strokeStyle = 'rgba(5,8,20,0.85)'; g.strokeText(r.name, lx, ly);
+        g.fillStyle = 'rgba(255,255,255,0.9)'; g.fillText(r.name, lx, ly);
+      }
+    }
+    c._k = k; c._ox = ox; c._oy = oy;
+    miniCache.set(key, c);
+    return c;
+  }
+
+  // opts: { map, me:{x,y,color}, tasks:[{x,y}], fixes:[{x,y}], vents:[{x,y}], emergency, labels, view:{w,h} }
+  function minimap(cv, o) {
+    const g = cv.getContext('2d');
+    const w = cv.width, h = cv.height;
+    const t = performance.now() / 1000;
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.clearRect(0, 0, w, h);
+    g.lineJoin = 'round';
+    if (!o.map) return;
+    const dp = o.dpr || 1;
+    const base = miniBase(o.map, w, h, dp, !!o.labels);
+    g.drawImage(base, 0, 0);
+    const k = base._k, ox = base._ox, oy = base._oy;
+    const P = (x, y) => [ox + (x / T) * k, oy + (y / T) * k];
+    const u = 0.8 * dp * Math.sqrt(w / dp / 150); // escala de los iconos (en píxeles reales)
+    for (const v of o.vents || []) {
+      const [vx, vy] = P(v.x * T, v.y * T);
+      g.fillStyle = '#9aa3c7'; g.fillRect(vx - 3 * u, vy - 2 * u, 6 * u, 4 * u);
+    }
+    if (o.emergency) {
+      const [ex, ey] = P(o.emergency.x * T, o.emergency.y * T);
+      g.fillStyle = '#ff3048'; g.strokeStyle = '#141420'; g.lineWidth = 1.5 * u;
+      g.beginPath(); g.arc(ex, ey, 3.2 * u, 0, Math.PI * 2); g.fill(); g.stroke();
+    }
+    for (const s of o.tasks || []) {
+      const [sx, sy] = P(s.x * T, s.y * T);
+      const b = Math.sin(t * 5) * 1.2 * u;
+      g.fillStyle = '#ffd34d'; g.strokeStyle = '#141420'; g.lineWidth = 1.5 * u;
+      g.beginPath(); g.moveTo(sx, sy - 6 * u + b); g.lineTo(sx + 4 * u, sy + b); g.lineTo(sx, sy + 6 * u + b); g.lineTo(sx - 4 * u, sy + b); g.closePath(); g.fill(); g.stroke();
+    }
+    for (const s of o.fixes || []) {
+      const [sx, sy] = P(s.x * T, s.y * T);
+      const pr = (t * 1.6) % 1;
+      g.strokeStyle = `rgba(255,48,72,${1 - pr})`; g.lineWidth = 2 * u;
+      g.beginPath(); g.arc(sx, sy, (4 + pr * 10) * u, 0, Math.PI * 2); g.stroke();
+      g.fillStyle = Math.sin(t * 8) > 0 ? '#ff3048' : '#ffffff';
+      g.beginPath(); g.arc(sx, sy, 3.5 * u, 0, Math.PI * 2); g.fill();
+    }
+    if (o.me) {
+      const [mx, my] = P(o.me.x, o.me.y);
+      if (o.view) {
+        const vw = (o.view.w / T) * k, vh = (o.view.h / T) * k;
+        g.strokeStyle = 'rgba(255,255,255,0.35)'; g.lineWidth = 1.2 * u;
+        g.strokeRect(mx - vw / 2, my - vh / 2, vw, vh);
+      }
+      const c = S.COLORS[o.me.color] || S.COLORS[0];
+      const pr = (t * 1.2) % 1;
+      g.strokeStyle = `rgba(255,255,255,${0.8 - pr * 0.8})`; g.lineWidth = 2 * u;
+      g.beginPath(); g.arc(mx, my, (5 + pr * 9) * u, 0, Math.PI * 2); g.stroke();
+      g.fillStyle = c.body; g.strokeStyle = '#ffffff'; g.lineWidth = 2 * u;
+      g.beginPath(); g.arc(mx, my, 4.5 * u, 0, Math.PI * 2); g.fill(); g.stroke();
+    }
+  }
+
   // state: { map, camX, camY, players: [{x,y,color,f,moving,name,host,conn}] }
+  let lastFrameT = 0;
   function frame(state) {
     const t = performance.now() / 1000;
+    const dt = Math.min(0.1, lastFrameT ? t - lastFrameT : 0.016);
+    lastFrameT = t;
+    stepParts(dt);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     drawBackground(state.map, state.camX, state.camY);
-    if (!state.map) return;
+    if (!state.map) { drawMenu(t, dt); return; }
 
     const sc = worldScale();
     ctx.save();
@@ -445,30 +755,59 @@ window.Render = (function () {
     const y0 = Math.floor((state.camY - halfH) / T) - 1, y1 = Math.ceil((state.camY + halfH) / T) + 1;
 
     drawMap(state.map, x0, y0, x1, y1);
+    drawRoomLights(state.map, x0, y0, x1, y1, t);
+    drawWallDetails(state.map, x0, y0, x1, y1, t);
     drawRoomLabels(state.map, x0, y0, x1, y1);
-    drawDecor(state.map);
-    drawStations(state.map, state);
+    const view = { x0: state.camX - halfW - 120, x1: state.camX + halfW + 120, y0: state.camY - halfH - 120, y1: state.camY + halfH + 120 };
+    drawDecor(state.map, view);
+    drawStations(state.map, state, view);
 
     for (const b of state.bodies || []) drawBody(b.x, b.y, b.color);
 
-    const list = state.players.slice().sort((a, b) => a.y - b.y);
+    const list = state.players.filter((p) => inView(view, p.x, p.y)).sort((a, b) => a.y - b.y);
+    // Polvito a los pies de quien camina
+    for (const p of list) {
+      if (!p.moving || p.ghost) continue;
+      const lt = lastDust.get(p.id) || 0;
+      if (t - lt > 0.16) { lastDust.set(p.id, t); burst(p.x, p.y + S.PLAYER_RADIUS * 0.95, 'dust'); }
+    }
+    drawParts('low');
     for (const p of list) drawCrew(p.x, p.y, p.color, p.f, p.moving, t + p.id * 0.37, p.ghost ? 0.45 : p.conn ? 1 : 0.55);
     for (const p of list) drawName(p.x, p.y, p.name, p.host, !p.conn, p.nameColor);
+    drawParts('high');
 
     ctx.restore();
     if (state.map.theme === 'ice') drawBlizzard();
-    if (state.vision) drawVision(state.vision, sc);
+    if (state.vision) drawVision(state.vision * (state.flicker ? 1 + Math.sin(t * 23) * 0.03 + Math.sin(t * 7) * 0.04 : 1), sc);
+    else drawVignette();
     if (state.arrows) for (const a of state.arrows) drawArrow(a, state.camX, state.camY, sc);
+    if (state.flashUntil && performance.now() < state.flashUntil) {
+      ctx.fillStyle = `rgba(255,30,50,${((state.flashUntil - performance.now()) / 400) * 0.45})`;
+      ctx.fillRect(0, 0, cssW, cssH);
+    }
     drawJoystick();
   }
 
+  function drawVignette() {
+    const g = ctx.createRadialGradient(cssW / 2, cssH / 2, Math.min(cssW, cssH) * 0.45, cssW / 2, cssH / 2, Math.max(cssW, cssH) * 0.75);
+    g.addColorStop(0, 'rgba(0,0,0,0)');
+    g.addColorStop(1, 'rgba(0,0,10,0.45)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, cssW, cssH);
+  }
+
   // Consolas de tareas, ventilaciones y puntos de arreglo de sabotajes.
-  function drawStations(map, state) {
+  function drawStations(map, state, view) {
     const t = performance.now() / 1000;
     const pend = state.myTasks || new Set();
     for (const v of map.vents || []) {
       const x = v.x * T, y = v.y * T;
+      if (!inView(view, x, y)) continue;
       const lit = state.ventIds && state.ventIds.has(v.id);
+      if (lit) {
+        ctx.fillStyle = `rgba(255,90,106,${0.25 + Math.sin(t * 6) * 0.12})`;
+        ctx.beginPath(); ctx.ellipse(x, y, 46, 32, 0, 0, Math.PI * 2); ctx.fill();
+      }
       ctx.fillStyle = '#3a3f4f'; ctx.strokeStyle = lit ? '#ff5a6a' : OUTLINE; ctx.lineWidth = lit ? 5 : 3;
       roundRect(x - 26, y - 16, 52, 32, 6); ctx.fill(); ctx.stroke();
       ctx.strokeStyle = '#1d2030'; ctx.lineWidth = 3;
@@ -478,15 +817,23 @@ window.Render = (function () {
     }
     for (const k of map.tasks || []) {
       const x = k.x * T, y = k.y * T;
+      if (!inView(view, x, y)) continue;
       const mine = pend.has(k.id);
       ctx.fillStyle = '#2b3348'; ctx.strokeStyle = OUTLINE; ctx.lineWidth = 3;
       roundRect(x - 20, y - 18, 40, 28, 5); ctx.fill(); ctx.stroke();
       ctx.fillStyle = mine ? '#ffd34d' : '#4fb3ff';
       ctx.fillRect(x - 14, y - 13, 28, 14);
       if (mine) {
+        const halo = ctx.createRadialGradient(x, y - 4, 4, x, y - 4, 60);
+        halo.addColorStop(0, `rgba(255,211,77,${0.28 + Math.sin(t * 3) * 0.1})`);
+        halo.addColorStop(1, 'rgba(255,211,77,0)');
+        ctx.fillStyle = halo;
+        ctx.beginPath(); ctx.arc(x, y - 4, 60, 0, Math.PI * 2); ctx.fill();
         ctx.strokeStyle = `rgba(255,211,77,${0.55 + Math.sin(t * 5) * 0.35})`;
         ctx.lineWidth = 5;
         roundRect(x - 26, y - 24, 52, 40, 8); ctx.stroke();
+        ctx.fillStyle = 'rgba(255,255,255,' + (0.5 + Math.sin(t * 9 + x) * 0.4) + ')';
+        ctx.fillRect(x - 14 + ((t * 30) % 24), y - 13, 4, 14);
         ctx.fillStyle = '#ffd34d'; ctx.strokeStyle = OUTLINE; ctx.lineWidth = 4;
         ctx.font = 'bold 30px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
         const by = y - 28 + Math.sin(t * 4) * 4;
@@ -496,16 +843,16 @@ window.Render = (function () {
     const fx = map.fixes || {};
     const sab = state.sabotage;
     const spots = [];
-    if (fx.luces) spots.push([fx.luces, sab && sab.kind === 'luces', '💡']);
-    if (fx.reactorA) spots.push([fx.reactorA, sab && sab.kind === 'reactor', '✋']);
-    if (fx.reactorB) spots.push([fx.reactorB, sab && sab.kind === 'reactor', '✋']);
+    if (fx.luces) spots.push([fx.luces, sab && sab.kind === 'luces', 'foco']);
+    if (fx.reactorA) spots.push([fx.reactorA, sab && sab.kind === 'reactor', 'mano']);
+    if (fx.reactorB) spots.push([fx.reactorB, sab && sab.kind === 'reactor', 'mano']);
     for (const [s, active, icon] of spots) {
       const x = s.x * T, y = s.y * T;
       ctx.fillStyle = active ? (Math.sin(t * 8) > 0 ? '#ff3048' : '#7a1020') : '#3b4258';
       ctx.strokeStyle = OUTLINE; ctx.lineWidth = 3;
       roundRect(x - 20, y - 20, 40, 40, 8); ctx.fill(); ctx.stroke();
-      ctx.font = '22px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(icon, x, y + 1);
+      const im = window.Icons && Icons.img(icon);
+      if (im && im.complete) ctx.drawImage(im, x - 15, y - 15, 30, 30);
     }
   }
 
@@ -517,9 +864,11 @@ window.Render = (function () {
     const k = Math.min(hw / Math.abs(dx || 1e-6), hh / Math.abs(dy || 1e-6));
     const x = cssW / 2 + dx * k, y = cssH / 2 + dy * k;
     const ang = Math.atan2(dy, dx);
+    const bob = Math.sin(performance.now() / 120) * 5;
     ctx.save();
-    ctx.translate(x, y);
+    ctx.translate(x - Math.cos(ang) * bob, y - Math.sin(ang) * bob);
     ctx.rotate(ang);
+    ctx.scale(1.25, 1.25);
     ctx.fillStyle = a.color || '#ff3048';
     ctx.strokeStyle = '#141420';
     ctx.lineWidth = 3;
@@ -555,6 +904,21 @@ window.Render = (function () {
     const t = performance.now() / 1000;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     drawStars(t * 400, t * 30);
+    // Planeta al fondo y estelas de velocidad
+    const px = cssW * 0.82, py = cssH * 0.25, pr = Math.min(cssW, cssH) * 0.16;
+    const pg = ctx.createRadialGradient(px - pr * 0.4, py - pr * 0.4, pr * 0.1, px, py, pr);
+    pg.addColorStop(0, '#7fa8ff'); pg.addColorStop(1, '#23306e');
+    ctx.fillStyle = pg; ctx.beginPath(); ctx.arc(px, py, pr, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(200,220,255,0.35)'; ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.ellipse(px, py, pr * 1.6, pr * 0.35, -0.3, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,0.22)'; ctx.lineWidth = 2;
+    for (let i = 0; i < 14; i++) {
+      const s = stars[i];
+      const len = 60 + s.r * 60;
+      const x = cssW + len - ((s.x * 3 + t * 900) % (cssW + len * 2)) - len;
+      const y = (s.y * 0.37) % cssH;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + len, y); ctx.stroke();
+    }
     if (colorIdx == null) return;
     const x = -60 + (cssW + 120) * progress;
     const y = cssH * 0.62 + Math.sin(progress * 6) * 12;
@@ -602,5 +966,7 @@ window.Render = (function () {
     ctx = prev;
   }
 
-  return { init, frame, ejectFrame, crewOn, crewRow, worldScale };
+  function viewSize() { const sc = worldScale(); return { w: cssW / sc, h: cssH / sc }; }
+
+  return { init, frame, ejectFrame, crewOn, crewRow, worldScale, burst, minimap, viewSize };
 })();
