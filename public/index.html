@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta name="theme-color" content="#0b0f1e">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <title>Amogos</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <canvas id="lienzo"></canvas>
+
+  <!-- Pantalla de inicio -->
+  <section id="inicio" class="pantalla">
+    <div class="tarjeta">
+      <h1 class="logo">AMOGOS</h1>
+      <p class="sub">¿Quién es el impostor?</p>
+      <label class="campo">
+        <span>Tu nombre</span>
+        <input id="nombre" maxlength="12" autocomplete="off" placeholder="Tripulante">
+      </label>
+      <div id="bloqueInvitacion" class="oculto">
+        <button id="btnUnirseInvitacion" class="btn btn-grande">Entrar a la sala <b id="codigoInvitacion"></b></button>
+        <button id="btnOtraSala" class="btn-link">Usar otra sala</button>
+      </div>
+      <div id="bloqueNormal">
+        <button id="btnCrear" class="btn btn-grande">Crear sala</button>
+        <div class="fila">
+          <input id="codigo" maxlength="4" autocomplete="off" placeholder="CÓDIGO" class="input-codigo">
+          <button id="btnUnirse" class="btn">Unirse</button>
+        </div>
+      </div>
+      <p id="error" class="error" role="alert"></p>
+    </div>
+  </section>
+
+  <!-- Interfaz durante el juego -->
+  <section id="hud" class="oculto">
+    <div class="hud-arriba-izq">
+      <button id="btnSalir" class="btn-icono" aria-label="Salir">✕</button>
+      <div id="infoSala" class="chip"></div>
+      <div id="infoRol" class="chip oculto"></div>
+    </div>
+    <div class="hud-arriba-der">
+      <div id="avisoConexion" class="chip chip-alerta oculto">Reconectando…</div>
+      <div id="infoJugadores" class="chip"></div>
+      <button id="btnSonido" class="btn-icono" aria-label="Sonido">🔊</button>
+      <button id="btnChat" class="btn-icono oculto" aria-label="Chat">💬<span id="chatNuevo" class="punto oculto"></span></button>
+    </div>
+
+    <div id="panelLobby" class="panel-lobby oculto">
+      <button id="btnCompartir" class="btn btn-chico">Invitar</button>
+      <button id="btnColor" class="btn btn-chico">Color</button>
+      <button id="btnAjustes" class="btn btn-chico">Ajustes</button>
+      <button id="btnEmpezar" class="btn btn-chico btn-verde oculto">Empezar</button>
+      <span id="esperaHost" class="chip oculto">Esperando al host…</span>
+    </div>
+    <div id="panelJuego" class="panel-juego oculto">
+      <div class="barra-tareas" aria-label="Progreso de tareas">
+        <span>TAREAS</span>
+        <div class="barra"><div id="barraTareas" class="barra-relleno"></div></div>
+      </div>
+      <div id="alertaSabotaje" class="alerta-sabotaje oculto"></div>
+    </div>
+    <div id="listaTareas" class="lista-tareas oculto">
+      <button id="btnListaTareas" class="lista-cabeza">Tareas ▾</button>
+      <p id="pista" class="pista"></p>
+      <ul id="tareasUl"></ul>
+    </div>
+    <div id="flash" class="flash-rojo oculto"></div>
+    <div id="menuSabotaje" class="menu-sabotaje oculto">
+      <button id="btnSabLuces" class="btn btn-chico">💡 Apagar luces</button>
+      <button id="btnSabReactor" class="btn btn-chico">☢️ Reactor</button>
+    </div>
+
+    <div class="botones-accion">
+      <button id="btnVentSig" class="btn-accion btn-vent oculto">➜<br>OTRA</button>
+      <button id="btnVentila" class="btn-accion btn-vent oculto" disabled>VENTILA</button>
+      <button id="btnSabotear" class="btn-accion btn-sabotear oculto">SABOTEAR<span id="sabCd" class="cd"></span></button>
+      <button id="btnReportar" class="btn-accion btn-reportar oculto" disabled>REPORTAR</button>
+      <button id="btnMatar" class="btn-accion btn-matar oculto" disabled>MATAR<span id="matarCd" class="cd"></span></button>
+      <button id="btnUsar" class="btn-accion" disabled>USAR</button>
+    </div>
+  </section>
+
+  <!-- Chat flotante (lobby y fantasmas). En reuniones se mueve dentro de la pantalla de reunión. -->
+  <section id="chatFlotante" class="chat-flotante oculto">
+    <div id="chat" class="chat">
+      <div class="chat-cabeza">
+        <span id="chatTitulo">Chat</span>
+        <button id="btnCerrarChat" class="btn-icono btn-icono-chico" aria-label="Cerrar chat">✕</button>
+      </div>
+      <div id="chatMensajes" class="chat-mensajes" aria-live="polite"></div>
+      <form id="chatForm" class="chat-form" autocomplete="off">
+        <input id="chatInput" maxlength="140" placeholder="Escribe…" enterkeyhint="send">
+        <button class="btn btn-chico" type="submit">Enviar</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- Reunión -->
+  <section id="reunion" class="reunion oculto">
+    <div class="reunion-izq">
+      <div class="reunion-cabeza">
+        <h2 id="reunionTitulo"></h2>
+        <span id="reunionTimer" class="chip"></span>
+      </div>
+      <p id="reunionSub" class="reunion-sub"></p>
+      <div id="votos" class="votos"></div>
+      <div class="reunion-pie">
+        <button id="btnSaltar" class="btn btn-chico">Saltar voto</button>
+        <span id="votosSaltar" class="saltar-votos"></span>
+      </div>
+    </div>
+    <div id="reunionChat" class="reunion-der"></div>
+  </section>
+
+  <!-- Expulsión / fin -->
+  <section id="expulsion" class="cartel oculto">
+    <p id="expulsionTexto" class="cartel-titulo"></p>
+    <p id="expulsionSub" class="cartel-sub"></p>
+  </section>
+  <section id="fin" class="cartel oculto">
+    <p id="finTitulo" class="cartel-titulo"></p>
+    <p id="finSub" class="cartel-sub"></p>
+    <canvas id="finLienzo" width="560" height="140"></canvas>
+    <p class="cartel-sub tenue">Volviendo al lobby…</p>
+  </section>
+
+  <!-- Revelación de rol -->
+  <section id="revelacion" class="cartel oculto">
+    <p id="revelacionSub" class="cartel-sub tenue">Eres…</p>
+    <p id="revelacionTitulo" class="cartel-titulo"></p>
+    <canvas id="revelacionLienzo" width="560" height="140"></canvas>
+    <p id="revelacionTexto" class="cartel-sub"></p>
+  </section>
+
+  <section id="muerteAviso" class="cartel cartel-rojo oculto">
+    <p class="cartel-titulo">TE MATARON</p>
+    <p class="cartel-sub">Ahora eres un fantasma. Puedes atravesar paredes y hablar con otros fantasmas.</p>
+  </section>
+
+  <!-- Minijuego de tarea -->
+  <section id="tareaModal" class="modal modal-tarea oculto">
+    <div class="tarjeta tarjeta-tarea">
+      <div class="tarea-cabeza">
+        <h2 id="tareaTitulo"></h2>
+        <button id="btnCerrarTarea" class="btn-icono btn-icono-chico" aria-label="Cerrar tarea">✕</button>
+      </div>
+      <div id="tareaContenido" class="tarea-contenido"></div>
+    </div>
+  </section>
+
+  <!-- Selector de color -->
+  <section id="selectorColor" class="modal oculto">
+    <div class="tarjeta">
+      <h2>Elige tu color</h2>
+      <div id="colores" class="colores"></div>
+      <button id="btnCerrarColor" class="btn">Listo</button>
+    </div>
+  </section>
+
+  <!-- Ajustes -->
+  <section id="ajustes" class="modal oculto">
+    <div class="tarjeta">
+      <h2>Ajustes de partida</h2>
+      <div id="ajustesLista" class="ajustes-lista"></div>
+      <button id="btnCerrarAjustes" class="btn">Listo</button>
+    </div>
+  </section>
+
+  <div id="toast" class="toast oculto"></div>
+
+  <!-- Aviso para girar el celular -->
+  <div id="girar" class="girar">
+    <div class="girar-icono">📱↻</div>
+    <p>Gira tu celular para jugar</p>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/shared/game.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/input.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/tasks.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

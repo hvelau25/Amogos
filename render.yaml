@@ -1,0 +1,12 @@
+# Configuración para Render (https://render.com). Crea el servicio solo a partir de este archivo.
+services:
+  - type: web
+    name: amogos
+    runtime: node
+    plan: free
+    buildCommand: npm install --omit=dev
+    startCommand: node server/index.js
+    healthCheckPath: /salud
+    envVars:
+      - key: NODE_VERSION
+        value: 22
