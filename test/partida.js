@@ -1,5 +1,7 @@
 // Prueba de una partida completa: 4 jugadores, roles, asesinato, reporte, chat, votación y fin.
 const { io } = require('socket.io-client');
+const Walk = require('./caminar.js');
+const S = require('../shared/game.js');
 const URL = process.env.URL || 'http://localhost:3000';
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const ok = (cond, msg) => { if (!cond) { console.error('FALLA:', msg); process.exit(1); } console.log('ok -', msg); };
@@ -20,16 +22,8 @@ function bot(name, i) {
   b.token = 'prueba' + i + 'xxxxxxx';
   return b;
 }
-async function walkTo(b, x, y) {
-  for (let i = 0; i < 200; i++) {
-    const dx = x - b.x, dy = y - b.y, d = Math.hypot(dx, dy);
-    if (d < 20) return;
-    const st = Math.min(12, d);
-    b.x += (dx / d) * st; b.y += (dy / d) * st;
-    b.s.emit('mov', { x: b.x, y: b.y, f: 1, m: 1 });
-    await wait(50);
-  }
-}
+// Camina esquivando paredes y objetos (ver caminar.js)
+async function walkTo(b, x, y) { await Walk.walkTo(S.MAPS[b.sala.map], b, x, y); }
 const self = (b) => b.sala.players.find((p) => p.id === b.me);
 
 (async () => {

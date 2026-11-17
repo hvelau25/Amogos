@@ -13,7 +13,7 @@
   const KILL_RANGE = 1.5 * TILE; // distancia para matar
   const REPORT_RANGE = 2.2 * TILE; // distancia para reportar un cuerpo
   const USE_RANGE = 1.6 * TILE; // distancia para usar el botón de emergencia
-  const VISION = { tripulante: 3.6 * TILE, impostor: 5.2 * TILE };
+  const VISION = { tripulante: 4.6 * TILE, impostor: 6.4 * TILE }; // las paredes la tapan (lo calcula el cliente)
   const CHAT_MAX = 140;
 
   // Ajustes de partida que el host puede cambiar en el lobby.
@@ -30,7 +30,7 @@
   const MAP_CHOICES = ['estacion', 'hielo'];
   const SABOTAGE_COOLDOWN = 30; // segundos entre sabotajes
   const REACTOR_TIME = 40; // segundos para arreglar el reactor
-  const LIGHTS_VISION = 1.4 * TILE; // visión de tripulantes con las luces apagadas
+  const LIGHTS_VISION = 1.8 * TILE; // visión de tripulantes con las luces apagadas
 
   // Tipos de minijuego de las tareas.
   const TASK_TYPES = {
@@ -67,6 +67,27 @@
     { name: 'Celeste', body: '#3fd6e0', dark: '#1f8a91' },
     { name: 'Lima', body: '#a6e83a', dark: '#66921c' },
   ];
+
+  // Personalización: sombreros y outfits (dibujos propios, en render.js). Índice 0 = nada.
+  const HATS = ['Nada', 'Gorra', 'Vaquero', 'Corona', 'Fiesta', 'Gorro de lana', 'Chef', 'Brote', 'Audífonos', 'Cuernos', 'Aureola', 'Copa', 'Flor'];
+  const OUTFITS = ['Nada', 'Corbata', 'Moño', 'Bufanda', 'Capa', 'Mochila', 'Placa', 'Tirantes'];
+
+  // Huella de choque de cada objeto (unidades de mundo, relativa a su centro): hw/hh = media anchura/altura, oy = desplazamiento.
+  // Es un poco más chica que el dibujo para que se sienta natural.
+  const FOOTPRINT = {
+    table: { hw: 40, hh: 22 },
+    core: { hw: 36, hh: 30 },
+    crate: { hw: 20, hh: 17, oy: 3 },
+    barrel: { hw: 15, hh: 12, oy: 6 },
+    bed: { hw: 41, hh: 19 },
+    plant: { hw: 14, hh: 10, oy: 8 },
+    bench: { hh: 16 }, // ancho según d.w
+    console: { hh: 18 },
+    dish: { hw: 22, hh: 16, oy: 4 },
+    telescope: { hw: 22, hh: 10, oy: 15 },
+    sled: { hw: 44, hh: 15, oy: 4 },
+    campanel: { hw: 36, hh: 18 },
+  };
 
   // Los mapas se definen con rectángulos (en casillas) para salas y pasillos.
   // A partir de eso se genera la cuadrícula de colisión.
@@ -164,6 +185,16 @@
         reactorA: { x: 1.6, y: 15, room: 'Reactor' },
         reactorB: { x: 1.6, y: 20, room: 'Reactor' },
       },
+      // Cámaras de seguridad: panel donde se miran y el centro de lo que enfoca cada cámara.
+      cameras: {
+        panel: { x: 13.5, y: 19.45, room: 'Seguridad' },
+        cams: [
+          { id: 'c1', name: 'Pasillo central', x: 28, y: 17.5 },
+          { id: 'c2', name: 'Pasillo del reactor', x: 6, y: 24.5 },
+          { id: 'c3', name: 'Escudos', x: 47, y: 23.5 },
+          { id: 'c4', name: 'Oxígeno', x: 38, y: 7 },
+        ],
+      },
       // Ventilaciones: las del mismo grupo están conectadas.
       vents: [
         { id: 'v1', group: 'a', x: 14.5, y: 7.5 },
@@ -228,7 +259,7 @@
         { t: 'core', x: 5.5, y: 19.6, c: '255,150,60' },
         { t: 'plant', x: 4.4, y: 4.6 }, { t: 'plant', x: 6.2, y: 4.6 }, { t: 'plant', x: 8, y: 4.6 }, { t: 'plant', x: 9.8, y: 4.6 },
         { t: 'plant', x: 4.4, y: 6.6 }, { t: 'plant', x: 9.8, y: 6.6 },
-        { t: 'bench', x: 18.5, y: 7.8, w: 3 }, { t: 'bench', x: 21.6, y: 7.8, w: 1.6 },
+        { t: 'bench', x: 18.5, y: 7.8, w: 3 }, { t: 'bench', x: 23.1, y: 7.8, w: 1.6 },
         { t: 'telescope', x: 42, y: 5.4 },
         { t: 'bed', x: 52, y: 9.6 }, { t: 'bed', x: 55, y: 9.6 }, { t: 'bed', x: 52, y: 12 }, { t: 'bed', x: 55, y: 12 },
         { t: 'table', x: 53.5, y: 20 },
@@ -269,6 +300,15 @@
         reactorA: { x: 2.6, y: 16.5, room: 'Generador' },
         reactorB: { x: 2.6, y: 21.5, room: 'Generador' },
       },
+      cameras: {
+        panel: { x: 57.2, y: 31.5, room: 'Sala de radio' },
+        cams: [
+          { id: 'c1', name: 'Pasillo norte', x: 30, y: 10 },
+          { id: 'c2', name: 'Pasillo este', x: 42, y: 20 },
+          { id: 'c3', name: 'Pasillo oeste', x: 12, y: 19 },
+          { id: 'c4', name: 'Pasillo sur', x: 30, y: 27 },
+        ],
+      },
       vents: [
         { id: 'h1', group: 'a', x: 4.5, y: 7.5 },
         { id: 'h2', group: 'a', x: 7.5, y: 22 },
@@ -299,7 +339,17 @@
     };
     def.corridors.forEach((c) => fill(c, -1));
     def.rooms.forEach((r, i) => fill(r, i));
-    return Object.assign({}, def, { grid, roomOf });
+    // Objetos sólidos: rectángulos de choque a partir de la decoración (y del panel de cámaras).
+    const blocks = [];
+    const items = (def.decor || []).concat(def.cameras ? [{ t: 'campanel', x: def.cameras.panel.x, y: def.cameras.panel.y }] : []);
+    for (const d of items) {
+      const f = FOOTPRINT[d.t];
+      if (!f) continue;
+      const hw = f.hw != null ? f.hw : ((d.w || 2) * TILE) / 2 - 4;
+      const cx = d.x * TILE, cy = d.y * TILE + (f.oy || 0);
+      blocks.push({ x0: cx - hw, y0: cy - f.hh, x1: cx + hw, y1: cy + f.hh });
+    }
+    return Object.assign({}, def, { grid, roomOf, blocks });
   }
 
   const MAPS = {};
@@ -310,16 +360,30 @@
     return map.grid[ty * map.width + tx] === 0;
   }
 
-  // Caja de colisión cuadrada del tamaño del jugador.
-  function collides(map, x, y, r) {
+  // Caja de colisión cuadrada del tamaño del jugador, contra paredes y (si no se pide lo contrario) objetos.
+  function collides(map, x, y, r, noBlocks) {
     const x0 = Math.floor((x - r) / TILE), x1 = Math.floor((x + r) / TILE);
     const y0 = Math.floor((y - r) / TILE), y1 = Math.floor((y + r) / TILE);
     for (let ty = y0; ty <= y1; ty++)
       for (let tx = x0; tx <= x1; tx++) if (isSolidTile(map, tx, ty)) return true;
+    if (!noBlocks && map.blocks)
+      for (const b of map.blocks) if (x + r > b.x0 && x - r < b.x1 && y + r > b.y0 && y - r < b.y1) return true;
     return false;
   }
 
-  // Mueve por ejes separados para deslizar contra las paredes.
+  // Avanza d en un eje hasta donde se pueda (búsqueda binaria: sirve igual para paredes y objetos).
+  function slide(map, x, y, d, r, horiz) {
+    const base = horiz ? x : y;
+    // Si ya está encimado en un objeto (p. ej. una posición vieja), se le deja salir: solo cuentan las paredes.
+    const noBlocks = collides(map, x, y, r) && !collides(map, x, y, r, true);
+    const hit = (k) => (horiz ? collides(map, x + d * k, y, r, noBlocks) : collides(map, x, y + d * k, r, noBlocks));
+    if (!hit(1)) return base + d;
+    let lo = 0, hi = 1;
+    for (let i = 0; i < 9; i++) { const m = (lo + hi) / 2; if (hit(m)) hi = m; else lo = m; }
+    return base + d * lo;
+  }
+
+  // Mueve por ejes separados para deslizar contra paredes y objetos.
   function move(map, x, y, dx, dy, r, ghost) {
     r = r || PLAYER_RADIUS;
     if (ghost) {
@@ -329,24 +393,45 @@
         y: Math.max(r, Math.min(map.height * TILE - r, y + dy)),
       };
     }
-    const EPS = 0.01;
-    if (dx !== 0) {
-      let nx = x + dx;
-      if (collides(map, nx, y, r)) {
-        nx = dx > 0 ? Math.floor((nx + r) / TILE) * TILE - r - EPS : Math.floor((nx - r) / TILE + 1) * TILE + r + EPS;
-        if (collides(map, nx, y, r)) nx = x;
-      }
-      x = nx;
-    }
-    if (dy !== 0) {
-      let ny = y + dy;
-      if (collides(map, x, ny, r)) {
-        ny = dy > 0 ? Math.floor((ny + r) / TILE) * TILE - r - EPS : Math.floor((ny - r) / TILE + 1) * TILE + r + EPS;
-        if (collides(map, x, ny, r)) ny = y;
-      }
-      y = ny;
-    }
+    if (dx !== 0) x = slide(map, x, y, dx, r, true);
+    if (dy !== 0) y = slide(map, x, y, dy, r, false);
     return { x, y };
+  }
+
+  // Punto libre más cercano (si x,y cae encima de un objeto o pared, busca en espiral).
+  function freeSpot(map, x, y, r) {
+    r = r || PLAYER_RADIUS;
+    if (!collides(map, x, y, r)) return { x, y };
+    for (let d = 8; d <= 256; d += 8)
+      for (let i = 0; i < 16; i++) {
+        const a = (i / 16) * Math.PI * 2;
+        const nx = x + Math.cos(a) * d, ny = y + Math.sin(a) * d;
+        if (!collides(map, nx, ny, r)) return { x: nx, y: ny };
+      }
+    return { x, y };
+  }
+
+  // Distancia hasta la primera pared en la dirección (ux,uy) unitaria, casilla por casilla (DDA). Los objetos no tapan.
+  function rayDist(map, x, y, ux, uy, maxD) {
+    let tx = Math.floor(x / TILE), ty = Math.floor(y / TILE);
+    if (isSolidTile(map, tx, ty)) return 0;
+    const sx = ux > 0 ? 1 : -1, sy = uy > 0 ? 1 : -1;
+    const ddx = ux !== 0 ? Math.abs(TILE / ux) : Infinity, ddy = uy !== 0 ? Math.abs(TILE / uy) : Infinity;
+    let nx = ux !== 0 ? (ux > 0 ? (tx + 1) * TILE - x : x - tx * TILE) / Math.abs(ux) : Infinity;
+    let ny = uy !== 0 ? (uy > 0 ? (ty + 1) * TILE - y : y - ty * TILE) / Math.abs(uy) : Infinity;
+    for (let i = 0; i < 80; i++) {
+      let t;
+      if (nx < ny) { t = nx; nx += ddx; tx += sx; } else { t = ny; ny += ddy; ty += sy; }
+      if (t >= maxD) return maxD;
+      if (isSolidTile(map, tx, ty)) return t;
+    }
+    return maxD;
+  }
+  // ¿Hay línea de vista entre dos puntos? (solo las paredes tapan)
+  function lineOfSight(map, ax, ay, bx, by) {
+    const d = Math.hypot(bx - ax, by - ay);
+    if (d < 1) return true;
+    return rayDist(map, ax, ay, (bx - ax) / d, (by - ay) / d, d) >= d - 0.5;
   }
 
   // Posiciones de aparición en círculo alrededor del punto de inicio del mapa.
@@ -355,7 +440,7 @@
     const n = Math.max(total, 1);
     const a = (index / n) * Math.PI * 2 - Math.PI / 2;
     const rad = n === 1 ? 0 : s.radius;
-    return { x: (s.x + Math.cos(a) * rad) * TILE, y: (s.y + Math.sin(a) * rad) * TILE };
+    return freeSpot(map, (s.x + Math.cos(a) * rad) * TILE, (s.y + Math.sin(a) * rad) * TILE);
   }
 
   // Tareas que se pueden repartir: cadenas (varias etapas) + estaciones sueltas que no son parte de una cadena.
@@ -380,5 +465,5 @@
     return i >= 0 ? map.rooms[i] : null;
   }
 
-  return { taskPool, taskName, HARD_TASKS, MAP_CHOICES, SABOTAGE_COOLDOWN, REACTOR_TIME, LIGHTS_VISION, TASK_TYPES, TILE, PLAYER_RADIUS, PLAYER_SPEED, MAX_PLAYERS, NAME_MAX, MIN_PLAYERS, KILL_RANGE, REPORT_RANGE, USE_RANGE, VISION, CHAT_MAX, SETTINGS_OPTIONS, DEFAULT_SETTINGS, impostorCount, COLORS, MAPS, isSolidTile, collides, move, spawnPoint, roomAt };
+  return { HATS, OUTFITS, freeSpot, lineOfSight, rayDist, taskPool, taskName, HARD_TASKS, MAP_CHOICES, SABOTAGE_COOLDOWN, REACTOR_TIME, LIGHTS_VISION, TASK_TYPES, TILE, PLAYER_RADIUS, PLAYER_SPEED, MAX_PLAYERS, NAME_MAX, MIN_PLAYERS, KILL_RANGE, REPORT_RANGE, USE_RANGE, VISION, CHAT_MAX, SETTINGS_OPTIONS, DEFAULT_SETTINGS, impostorCount, COLORS, MAPS, isSolidTile, collides, move, spawnPoint, roomAt };
 });

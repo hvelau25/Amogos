@@ -24,9 +24,9 @@ window.Render = (function () {
     canvas.height = Math.round(cssH * dpr);
   }
 
-  // Cuántas unidades de mundo entran en pantalla: ~7.5 casillas de alto en celular.
+  // Cuántas unidades de mundo entran en pantalla: ~9.5 casillas de alto en celular (antes 7.5; se pidió vista más amplia).
   function worldScale() {
-    return Math.min(cssH / (7.5 * T), cssW / (13 * T));
+    return Math.min(cssH / (9.5 * T), cssW / (17 * T));
   }
 
   function drawStars(camX, camY) {
@@ -268,6 +268,18 @@ window.Render = (function () {
         ctx.fillStyle = '#4fb3ff'; ctx.beginPath(); ctx.arc(0, -52, 9, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
         ctx.restore();
         break;
+      case 'campanel': { // panel de cámaras: escritorio con 4 pantallitas
+        shadowEllipse(x, y + 20, 40, 8);
+        ctx.fillStyle = '#3b4258'; roundRect(x - 38, y - 6, 76, 26, 6); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#20263a'; roundRect(x - 36, y - 34, 72, 32, 5); ctx.fill(); ctx.stroke();
+        for (let i = 0; i < 4; i++) {
+          const sx = x - 32 + (i % 2) * 33, sy = y - 31 + Math.floor(i / 2) * 14;
+          ctx.fillStyle = `rgba(110,230,170,${0.55 + Math.sin(now * 3 + i * 1.7) * 0.2})`;
+          ctx.fillRect(sx, sy, 30, 12);
+        }
+        ctx.fillStyle = '#ffd34d'; ctx.fillRect(x - 24, y + 6, 10, 5); ctx.fillStyle = '#ff5a6a'; ctx.fillRect(x + 14, y + 6, 10, 5);
+        break;
+      }
       case 'sled':
         shadowEllipse(x, y + 24, 46, 9);
         ctx.strokeStyle = OUTLINE; ctx.lineWidth = 5;
@@ -282,11 +294,32 @@ window.Render = (function () {
 
   // v = rectángulo visible en unidades de mundo (con margen): lo de afuera no se dibuja.
   const inView = (v, x, y) => !v || (x >= v.x0 && x <= v.x1 && y >= v.y0 && y <= v.y1);
+  // Objetos al ras del piso (núcleo del reactor): siempre debajo de todo.
+  const FLAT = { core: 1 };
   function drawDecor(map, v) {
     const now = performance.now() / 1000;
-    for (const d of map.decor || []) if (inView(v, d.x * T, d.y * T)) drawItem(d, now);
-    // Botón de emergencia (sobre la mesa central)
-    if (map.emergency) {
+    for (const d of map.decor || []) if (FLAT[d.t] && inView(v, d.x * T, d.y * T)) drawItem(d, now);
+    if (map.id === 'lobby') {
+      ctx.fillStyle = 'rgba(255,255,255,0.08)';
+      ctx.font = 'bold 40px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('LOBBY', 8 * T, 2.2 * T);
+    }
+  }
+  // Objetos con altura (cajas, camas, mesas...): se ordenan por y junto con los jugadores,
+  // así quien está detrás de una caja queda tapado y quien está delante la tapa.
+  function decorDrawables(map, v, out) {
+    for (const d of map.decor || []) if (!FLAT[d.t] && inView(v, d.x * T, d.y * T)) out.push({ y: d.y * T, d });
+    if (map.cameras) {
+      const pn = map.cameras.panel;
+      if (inView(v, pn.x * T, pn.y * T)) out.push({ y: pn.y * T, d: { t: 'campanel', x: pn.x, y: pn.y } });
+    }
+    if (map.emergency && inView(v, map.emergency.x * T, map.emergency.y * T)) out.push({ y: map.emergency.y * T + 0.5, emergency: true });
+    return out;
+  }
+  function drawEmergency(map) {
+    const now = performance.now() / 1000;
+    {
       const ex = map.emergency.x * T, ey = map.emergency.y * T;
       const pr = (now * 0.7) % 1;
       ctx.strokeStyle = `rgba(255,60,80,${0.5 * (1 - pr)})`; ctx.lineWidth = 4;
@@ -296,11 +329,32 @@ window.Render = (function () {
       ctx.fillStyle = '#e8263b';
       ctx.beginPath(); ctx.ellipse(ex, ey - 4, 13, 8, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     }
-    if (map.id === 'lobby') {
-      ctx.fillStyle = 'rgba(255,255,255,0.08)';
-      ctx.font = 'bold 40px system-ui, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('LOBBY', 8 * T, 2.2 * T);
+  }
+
+  // Cámaras montadas en la pared de arriba de lo que enfocan. Luz roja parpadeante si alguien está mirando.
+  const camSpots = new Map();
+  function camDevices(map) {
+    let list = camSpots.get(map.id);
+    if (list) return list;
+    list = [];
+    for (const c of (map.cameras && map.cameras.cams) || []) {
+      let ty = Math.floor(c.y);
+      while (ty > 0 && !S.isSolidTile(map, Math.floor(c.x), ty)) ty--;
+      list.push({ x: c.x * T, y: ty * T + T * 0.55 });
+    }
+    camSpots.set(map.id, list);
+    return list;
+  }
+  function drawCamDevices(map, v, on, t) {
+    for (const c of camDevices(map)) {
+      if (!inView(v, c.x, c.y)) continue;
+      ctx.strokeStyle = OUTLINE; ctx.lineWidth = 3;
+      ctx.fillStyle = '#c9d3e6'; roundRect(c.x - 16, c.y - 10, 32, 18, 5); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#20263a'; ctx.beginPath(); ctx.arc(c.x, c.y + 8, 8, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      const lit = on && Math.sin(t * 6) > -0.2;
+      ctx.fillStyle = lit ? '#ff3048' : '#5a2a32';
+      ctx.beginPath(); ctx.arc(c.x + 10, c.y - 3, 3.5, 0, Math.PI * 2); ctx.fill();
+      if (lit) { ctx.globalAlpha = 0.35; ctx.beginPath(); ctx.arc(c.x + 10, c.y - 3, 10, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1; }
     }
   }
 
@@ -358,12 +412,13 @@ window.Render = (function () {
   }
 
   // Tripulante original: cuerpo redondito, casco tipo pecera con cara y antena.
-  function drawCrew(x, y, colorIdx, facing, moving, t, alpha, dead) {
+  function drawCrew(x, y, colorIdx, facing, moving, t, alpha, dead, look) {
     const c = S.COLORS[colorIdx] || S.COLORS[0];
     const r = S.PLAYER_RADIUS;
     const f = facing === -1 ? -1 : 1;
     const step = moving ? Math.sin(t * 14) : 0;
     const bob = moving ? -Math.abs(Math.sin(t * 14)) * 3 : Math.sin(t * 2) * 0.8;
+    const hat = (look && look.hat) || 0, outfit = (look && look.outfit) || 0;
 
     ctx.save();
     ctx.globalAlpha = alpha == null ? 1 : alpha;
@@ -377,6 +432,7 @@ window.Render = (function () {
     ctx.translate(x, y + bob);
     ctx.lineWidth = 3.5;
     ctx.strokeStyle = OUTLINE;
+    if (outfit) drawOutfitBack(outfit, r, f, t, moving);
 
     // Piernas
     for (const side of [-1, 1]) {
@@ -439,7 +495,197 @@ window.Render = (function () {
     ctx.strokeStyle = OUTLINE;
     ctx.beginPath(); ctx.arc(0, hy, hr, 0, Math.PI * 2); ctx.stroke();
 
+    if (outfit) drawOutfitFront(outfit, r, f);
+    if (hat) drawHat(hat, r, f, t);
     ctx.restore();
+  }
+
+  // ---------- Personalización (dibujos propios). Coordenadas relativas al centro del tripulante. ----------
+  // Lo que va detrás del cuerpo: capa y mochila.
+  function drawOutfitBack(o, r, f, t, moving) {
+    ctx.lineWidth = 3; ctx.strokeStyle = OUTLINE;
+    if (o === 4) { // capa
+      const fl = moving ? Math.sin(t * 12) * r * 0.12 : 0;
+      ctx.fillStyle = '#c4243a';
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.7, -r * 0.25);
+      ctx.lineTo(r * 0.7, -r * 0.25);
+      ctx.quadraticCurveTo(r * 0.9, r * 0.5, r * 0.75 - f * r * 0.1, r * 1.0);
+      ctx.lineTo(-f * r * 1.15 + fl, r * 1.05);
+      ctx.quadraticCurveTo(-f * r * 1.1, r * 0.3, -r * 0.7, -r * 0.25);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#ffd34d';
+      ctx.beginPath(); ctx.arc(-f * r * 0.15, -r * 0.05, r * 0.11, 0, Math.PI * 2); ctx.fill();
+    } else if (o === 5) { // mochila
+      ctx.fillStyle = '#6f8a3c';
+      roundRect(-f * r * 0.88 - (f > 0 ? r * 0.42 : 0), -r * 0.4, r * 0.42, r * 0.95, r * 0.15); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#4e6528';
+      roundRect(-f * r * 0.88 - (f > 0 ? r * 0.36 : -r * 0.06), r * 0.05, r * 0.3, r * 0.32, r * 0.08); ctx.fill(); ctx.stroke();
+    }
+  }
+  // Lo que va encima del cuerpo, bajo el casco.
+  function drawOutfitFront(o, r, f) {
+    ctx.lineWidth = 2.5; ctx.strokeStyle = OUTLINE;
+    const nx = f * r * 0.12; // el cuello mira hacia donde camina
+    if (o === 1) { // corbata
+      ctx.fillStyle = '#2f6fe0';
+      ctx.beginPath(); ctx.moveTo(nx - r * 0.15, r * 0.12); ctx.lineTo(nx + r * 0.15, r * 0.12); ctx.lineTo(nx + r * 0.09, r * 0.27); ctx.lineTo(nx - r * 0.09, r * 0.27); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(nx - r * 0.09, r * 0.27); ctx.lineTo(nx + r * 0.09, r * 0.27); ctx.lineTo(nx + r * 0.19, r * 0.72); ctx.lineTo(nx, r * 0.88); ctx.lineTo(nx - r * 0.19, r * 0.72); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(nx - r * 0.12, r * 0.5); ctx.lineTo(nx + r * 0.1, r * 0.4); ctx.moveTo(nx - r * 0.15, r * 0.68); ctx.lineTo(nx + r * 0.14, r * 0.56); ctx.stroke();
+    } else if (o === 2) { // moño (amarillo para que se vea sobre cualquier color)
+      const by = r * 0.3;
+      ctx.fillStyle = '#ffd34d';
+      for (const s of [-1, 1]) {
+        ctx.beginPath(); ctx.moveTo(nx, by); ctx.lineTo(nx + s * r * 0.4, by - r * 0.2); ctx.quadraticCurveTo(nx + s * r * 0.5, by, nx + s * r * 0.4, by + r * 0.2); ctx.closePath(); ctx.fill(); ctx.stroke();
+      }
+      ctx.fillStyle = '#e8263b';
+      ctx.beginPath(); ctx.arc(nx, by, r * 0.11, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    } else if (o === 3) { // bufanda
+      ctx.fillStyle = '#f28a1f';
+      roundRect(-r * 0.78, r * 0.02, r * 1.56, r * 0.26, r * 0.12); ctx.fill(); ctx.stroke();
+      roundRect(-f * r * 0.5 - r * 0.12, r * 0.12, r * 0.24, r * 0.55, r * 0.08); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,0.45)';
+      ctx.fillRect(-r * 0.4, r * 0.06, r * 0.12, r * 0.18); ctx.fillRect(r * 0.1, r * 0.06, r * 0.12, r * 0.18);
+    } else if (o === 6) { // placa (estrella)
+      star(-f * r * 0.5, r * 0.2, r * 0.2, '#ffd34d');
+    } else if (o === 7) { // tirantes
+      // Correa con contorno (trazo grueso negro + trazo de color encima) desde el casco hasta el cinturón
+      for (const [col, w] of [[OUTLINE, r * 0.2], ['#3f7be8', r * 0.11]]) {
+        ctx.strokeStyle = col; ctx.lineWidth = w; ctx.lineCap = 'round';
+        for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo(s * r * 0.46, r * 0.04); ctx.lineTo(s * r * 0.4, r * 0.46); ctx.stroke(); }
+      }
+      ctx.lineCap = 'butt';
+      ctx.fillStyle = '#ffd34d'; ctx.strokeStyle = OUTLINE; ctx.lineWidth = 2;
+      for (const s of [-1, 1]) { ctx.beginPath(); ctx.arc(s * r * 0.41, r * 0.4, r * 0.07, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
+    }
+  }
+  function star(x, y, rad, fill) {
+    ctx.fillStyle = fill; ctx.strokeStyle = OUTLINE; ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const a = -Math.PI / 2 + (i * Math.PI) / 5, rr = i % 2 ? rad * 0.45 : rad;
+      ctx[i ? 'lineTo' : 'moveTo'](x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+    }
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+  }
+  // Sombreros: se apoyan arriba del casco (el casco llega hasta y = -1.4r).
+  function drawHat(h, r, f, t) {
+    const cx = f * r * 0.04, y0 = -r * 1.22;
+    ctx.lineWidth = 3; ctx.strokeStyle = OUTLINE;
+    switch (h) {
+      case 1: // gorra
+        ctx.fillStyle = '#e2453b';
+        ctx.beginPath(); ctx.ellipse(cx + f * r * 0.55, y0 + r * 0.04, r * 0.45, r * 0.13, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.arc(cx, y0 + r * 0.06, r * 0.62, Math.PI, Math.PI * 2); ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(cx, y0 - r * 0.56, r * 0.09, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        break;
+      case 2: // vaquero
+        ctx.fillStyle = '#9a6a3a';
+        ctx.beginPath(); ctx.moveTo(cx - r * 0.48, y0); ctx.lineTo(cx - r * 0.4, y0 - r * 0.62);
+        ctx.quadraticCurveTo(cx, y0 - r * 0.42, cx + r * 0.4, y0 - r * 0.62); ctx.lineTo(cx + r * 0.48, y0); ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#5a3a1e'; ctx.fillRect(cx - r * 0.46, y0 - r * 0.2, r * 0.92, r * 0.13);
+        ctx.fillStyle = '#b07c48';
+        ctx.beginPath(); ctx.ellipse(cx, y0 + r * 0.02, r * 0.98, r * 0.18, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        break;
+      case 3: { // corona
+        ctx.fillStyle = '#ffcc33';
+        const w = r * 0.5;
+        ctx.beginPath(); ctx.moveTo(cx - w, y0 + r * 0.05); ctx.lineTo(cx - w, y0 - r * 0.42); ctx.lineTo(cx - w * 0.5, y0 - r * 0.18);
+        ctx.lineTo(cx, y0 - r * 0.55); ctx.lineTo(cx + w * 0.5, y0 - r * 0.18); ctx.lineTo(cx + w, y0 - r * 0.42); ctx.lineTo(cx + w, y0 + r * 0.05); ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#e8263b'; ctx.beginPath(); ctx.arc(cx, y0 - r * 0.08, r * 0.09, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#3fd6e0'; ctx.beginPath(); ctx.arc(cx - w * 0.6, y0 - r * 0.06, r * 0.06, 0, Math.PI * 2); ctx.arc(cx + w * 0.6, y0 - r * 0.06, r * 0.06, 0, Math.PI * 2); ctx.fill();
+        break;
+      }
+      case 4: // gorro de fiesta
+        ctx.fillStyle = '#8a4fd8';
+        ctx.beginPath(); ctx.moveTo(cx - r * 0.38, y0 + r * 0.05); ctx.lineTo(cx - f * r * 0.08, y0 - r * 0.95); ctx.lineTo(cx + r * 0.38, y0 + r * 0.05); ctx.closePath(); ctx.fill();
+        ctx.save(); ctx.clip();
+        ctx.fillStyle = '#ffd34d';
+        for (let i = 0; i < 3; i++) ctx.fillRect(cx - r, y0 - r * (0.15 + i * 0.3), r * 2, r * 0.1);
+        ctx.restore(); ctx.stroke();
+        ctx.fillStyle = '#ef6fbf'; ctx.beginPath(); ctx.arc(cx - f * r * 0.08, y0 - r * 0.97, r * 0.14, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        break;
+      case 5: // gorro de lana
+        ctx.fillStyle = '#2fae55';
+        ctx.beginPath(); ctx.arc(cx, y0 + r * 0.04, r * 0.6, Math.PI, Math.PI * 2); ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#e8edf2'; roundRect(cx - r * 0.66, y0 - r * 0.08, r * 1.32, r * 0.22, r * 0.1); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.arc(cx, y0 - r * 0.62, r * 0.17, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        break;
+      case 6: // chef
+        // Bollitos: primero el contorno grueso y luego el relleno, así no quedan líneas por dentro.
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.moveTo(cx - r * 0.02, y0 - r * 0.48); ctx.arc(cx - r * 0.28, y0 - r * 0.48, r * 0.26, 0, Math.PI * 2);
+        ctx.moveTo(cx + r * 0.54, y0 - r * 0.48); ctx.arc(cx + r * 0.28, y0 - r * 0.48, r * 0.26, 0, Math.PI * 2);
+        ctx.moveTo(cx + r * 0.3, y0 - r * 0.7); ctx.arc(cx, y0 - r * 0.7, r * 0.3, 0, Math.PI * 2);
+        ctx.rect(cx - r * 0.36, y0 - r * 0.5, r * 0.72, r * 0.3);
+        ctx.lineWidth = 6; ctx.stroke(); ctx.fill();
+        ctx.lineWidth = 3;
+        roundRect(cx - r * 0.4, y0 - r * 0.28, r * 0.8, r * 0.32, r * 0.06); ctx.fill(); ctx.stroke();
+        ctx.strokeStyle = 'rgba(0,0,0,0.18)'; ctx.lineWidth = 2;
+        for (const dx of [-0.18, 0.18]) { ctx.beginPath(); ctx.moveTo(cx + dx * r, y0 - r * 0.24); ctx.lineTo(cx + dx * r, y0); ctx.stroke(); }
+        break;
+      case 7: { // brote
+        const sw = Math.sin(t * 2.2) * 0.12;
+        ctx.save(); ctx.translate(cx, y0 + r * 0.05); ctx.rotate(sw);
+        ctx.strokeStyle = '#2b6b2f'; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(r * 0.08, -r * 0.3, 0, -r * 0.55); ctx.stroke();
+        ctx.fillStyle = '#5fd06a'; ctx.strokeStyle = OUTLINE; ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.ellipse(-r * 0.24, -r * 0.6, r * 0.26, r * 0.13, -0.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.ellipse(r * 0.24, -r * 0.62, r * 0.26, r * 0.13, 0.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.restore();
+        break;
+      }
+      case 8: { // audífonos
+        const hy = -r * 0.62;
+        ctx.strokeStyle = OUTLINE; ctx.lineWidth = 7;
+        ctx.beginPath(); ctx.arc(0, hy, r * 0.86, Math.PI * 1.08, Math.PI * 1.92); ctx.stroke();
+        ctx.strokeStyle = '#3b3f4a'; ctx.lineWidth = 3.5;
+        ctx.beginPath(); ctx.arc(0, hy, r * 0.86, Math.PI * 1.08, Math.PI * 1.92); ctx.stroke();
+        ctx.fillStyle = '#ef6fbf'; ctx.strokeStyle = OUTLINE; ctx.lineWidth = 3;
+        for (const s of [-1, 1]) { roundRect(s * r * 0.8 - r * 0.16, hy - r * 0.3, r * 0.32, r * 0.5, r * 0.12); ctx.fill(); ctx.stroke(); }
+        break;
+      }
+      case 9: // cuernos
+        ctx.fillStyle = '#e23b3b';
+        for (const s of [-1, 1]) { // cono curvo con base ancha, la punta hacia afuera
+          ctx.beginPath(); ctx.moveTo(cx + s * r * 0.12, y0 + r * 0.12);
+          ctx.quadraticCurveTo(cx + s * r * 0.2, y0 - r * 0.3, cx + s * r * 0.72, y0 - r * 0.38);
+          ctx.quadraticCurveTo(cx + s * r * 0.58, y0 - r * 0.12, cx + s * r * 0.6, y0 + r * 0.14);
+          ctx.closePath(); ctx.fill(); ctx.stroke();
+          ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.moveTo(cx + s * r * 0.28, y0 - r * 0.04); ctx.quadraticCurveTo(cx + s * r * 0.34, y0 - r * 0.22, cx + s * r * 0.56, y0 - r * 0.3); ctx.stroke();
+          ctx.strokeStyle = OUTLINE; ctx.lineWidth = 3;
+        }
+        break;
+      case 10: { // aureola
+        const fy = y0 - r * 0.45 + Math.sin(t * 2.5) * r * 0.06;
+        ctx.strokeStyle = 'rgba(255,230,120,0.45)'; ctx.lineWidth = 9;
+        ctx.beginPath(); ctx.ellipse(cx, fy, r * 0.5, r * 0.15, 0, 0, Math.PI * 2); ctx.stroke();
+        ctx.strokeStyle = '#ffd34d'; ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.ellipse(cx, fy, r * 0.5, r * 0.15, 0, 0, Math.PI * 2); ctx.stroke();
+        break;
+      }
+      case 11: // copa
+        ctx.fillStyle = '#26262e';
+        roundRect(cx - r * 0.38, y0 - r * 0.85, r * 0.76, r * 0.88, r * 0.06); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#c4243a'; ctx.fillRect(cx - r * 0.36, y0 - r * 0.24, r * 0.72, r * 0.14);
+        ctx.fillStyle = '#26262e';
+        ctx.beginPath(); ctx.ellipse(cx, y0 + r * 0.04, r * 0.64, r * 0.14, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        break;
+      case 12: { // flor
+        const fx = cx + f * r * 0.4, fy = y0 + r * 0.02;
+        ctx.fillStyle = '#ff8ac0'; ctx.lineWidth = 2;
+        for (let i = 0; i < 5; i++) {
+          const a = (i / 5) * Math.PI * 2 + t * 0.3;
+          ctx.beginPath(); ctx.arc(fx + Math.cos(a) * r * 0.19, fy + Math.sin(a) * r * 0.19, r * 0.14, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        }
+        ctx.fillStyle = '#ffd34d'; ctx.beginPath(); ctx.arc(fx, fy, r * 0.12, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        break;
+      }
+      default:
+    }
   }
 
   function drawName(x, y, name, isHost, disconnected, color) {
@@ -760,11 +1006,18 @@ window.Render = (function () {
     drawRoomLabels(state.map, x0, y0, x1, y1);
     const view = { x0: state.camX - halfW - 120, x1: state.camX + halfW + 120, y0: state.camY - halfH - 120, y1: state.camY + halfH + 120 };
     drawDecor(state.map, view);
+    drawCamDevices(state.map, view, state.camsOn, t);
     drawStations(state.map, state, view);
 
-    for (const b of state.bodies || []) drawBody(b.x, b.y, b.color);
+    // Visión: las paredes tapan. Fuera del polígono visible no se dibuja a nadie (ni cuerpos).
+    const eye = state.eye || { x: state.camX, y: state.camY };
+    const vr = state.vision ? state.vision * (state.flicker ? 1 + Math.sin(t * 23) * 0.03 + Math.sin(t * 7) * 0.04 : 1) : 0;
+    const seen = (x, y) => !vr || (Math.hypot(x - eye.x, y - eye.y) <= vr &&
+      (S.lineOfSight(state.map, eye.x, eye.y, x, y) || S.lineOfSight(state.map, eye.x, eye.y, x, y - S.PLAYER_RADIUS * 1.2)));
 
-    const list = state.players.filter((p) => inView(view, p.x, p.y)).sort((a, b) => a.y - b.y);
+    for (const b of state.bodies || []) if (seen(b.x, b.y)) drawBody(b.x, b.y, b.color, b);
+
+    const list = state.players.filter((p) => inView(view, p.x, p.y) && (p.id === state.meId || seen(p.x, p.y)));
     // Polvito a los pies de quien camina
     for (const p of list) {
       if (!p.moving || p.ghost) continue;
@@ -772,13 +1025,21 @@ window.Render = (function () {
       if (t - lt > 0.16) { lastDust.set(p.id, t); burst(p.x, p.y + S.PLAYER_RADIUS * 0.95, 'dust'); }
     }
     drawParts('low');
-    for (const p of list) drawCrew(p.x, p.y, p.color, p.f, p.moving, t + p.id * 0.37, p.ghost ? 0.45 : p.conn ? 1 : 0.55);
+    // Jugadores y objetos con altura, ordenados por y (profundidad)
+    const items = decorDrawables(state.map, view, list.map((p) => ({ y: p.y, p })));
+    items.sort((a, b) => a.y - b.y);
+    const now = t;
+    for (const it of items) {
+      if (it.p) { const p = it.p; drawCrew(p.x, p.y, p.color, p.f, p.moving, t + p.id * 0.37, p.ghost ? 0.45 : p.conn ? 1 : 0.55, false, p); }
+      else if (it.emergency) drawEmergency(state.map);
+      else { ctx.strokeStyle = OUTLINE; ctx.lineWidth = 4; drawItem(it.d, now); }
+    }
     for (const p of list) drawName(p.x, p.y, p.name, p.host, !p.conn, p.nameColor);
     drawParts('high');
 
     ctx.restore();
     if (state.map.theme === 'ice') drawBlizzard();
-    if (state.vision) drawVision(state.vision * (state.flicker ? 1 + Math.sin(t * 23) * 0.03 + Math.sin(t * 7) * 0.04 : 1), sc);
+    if (vr) drawShadow(state.map, eye, vr, state.camX, state.camY, sc);
     else drawVignette();
     if (state.arrows) for (const a of state.arrows) drawArrow(a, state.camX, state.camY, sc);
     if (state.flashUntil && performance.now() < state.flashUntil) {
@@ -878,29 +1139,164 @@ window.Render = (function () {
   }
 
   // Cuerpo: tripulante tendido de lado con ojos en X y un charquito.
-  function drawBody(x, y, colorIdx) {
+  function drawBody(x, y, colorIdx, look) {
     ctx.save();
     ctx.fillStyle = 'rgba(150,0,20,0.55)';
     ctx.beginPath(); ctx.ellipse(x + 4, y + 14, 34, 14, 0, 0, Math.PI * 2); ctx.fill();
     ctx.translate(x, y + 6);
     ctx.rotate(Math.PI / 2);
-    drawCrew(0, 0, colorIdx, 1, false, 0, 1, true);
+    drawCrew(0, 0, colorIdx, 1, false, 0, 1, true, look);
     ctx.restore();
   }
 
-  // Oscuridad fuera del radio de visión (en píxeles de pantalla).
-  function drawVision(radiusWorld, sc) {
-    const r = radiusWorld * sc;
-    const cx = cssW / 2, cy = cssH / 2;
-    const g = ctx.createRadialGradient(cx, cy, r * 0.75, cx, cy, r);
-    g.addColorStop(0, 'rgba(0,0,0,0)');
-    g.addColorStop(1, 'rgba(2,3,8,0.97)');
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, cssW, cssH);
+  // ---------- Visión tapada por paredes ----------
+  // Polígono de lo que se ve desde el ojo: rayos hacia cada esquina de pared cercana (y un círculo de rayos).
+  // Cada rayo entra un poco en la pared que toca, para que se vea la cara de la pared, pero no lo de atrás.
+  function visionPolygon(map, ex, ey, R) {
+    const angs = [];
+    for (let i = 0; i < 64; i++) angs.push((i / 64) * Math.PI * 2 - Math.PI); // mismo rango que atan2
+    const tx0 = Math.floor((ex - R) / T), tx1 = Math.floor((ex + R) / T);
+    const ty0 = Math.floor((ey - R) / T), ty1 = Math.floor((ey + R) / T);
+    const solid = (x, y) => S.isSolidTile(map, x, y);
+    for (let ty = ty0; ty <= ty1; ty++)
+      for (let tx = tx0; tx <= tx1; tx++) {
+        if (!solid(tx, ty)) continue;
+        if (solid(tx - 1, ty) && solid(tx + 1, ty) && solid(tx, ty - 1) && solid(tx, ty + 1)) continue; // pared interior
+        for (const [cx, cy] of [[tx, ty], [tx + 1, ty], [tx, ty + 1], [tx + 1, ty + 1]]) {
+          const a = Math.atan2(cy * T - ey, cx * T - ex);
+          angs.push(a - 0.0008, a + 0.0008);
+        }
+      }
+    angs.sort((a, b) => a - b);
+    const pts = [];
+    const DEEP = T * 0.8;
+    let la = -99;
+    for (const a of angs) {
+      if (a - la < 0.0004) continue;
+      la = a;
+      const ux = Math.cos(a), uy = Math.sin(a);
+      let d = S.rayDist(map, ex, ey, ux, uy, R);
+      if (d < R) {
+        // Entrar en la pared hasta DEEP, sin pasar a un piso del otro lado
+        const end = Math.min(R, d + DEEP);
+        let k = d + 2;
+        while (k < end && solid(Math.floor((ex + ux * k) / T), Math.floor((ey + uy * k) / T))) k += 4;
+        d = Math.min(k, end);
+      }
+      pts.push(ex + ux * d, ey + uy * d);
+    }
+    return pts;
+  }
+
+  // El polígono se guarda y solo se recalcula si el ojo se movió o el radio creció. Se calcula con un
+  // radio un poco mayor: lo que queda más allá de R ya está a oscuridad completa, así que se ve igual
+  // (y el parpadeo de luces apagadas no obliga a recalcular cada cuadro).
+  const visCache = { map: null, x: NaN, y: NaN, R: 0, pts: null };
+  function cachedVision(map, ex, ey, R) {
+    const x = Math.round(ex), y = Math.round(ey);
+    if (visCache.map !== map || visCache.x !== x || visCache.y !== y || visCache.R < R) {
+      visCache.map = map; visCache.x = x; visCache.y = y;
+      visCache.R = Math.ceil((R * 1.1) / 16) * 16;
+      visCache.pts = visionPolygon(map, x, y, visCache.R);
+    }
+    return visCache.pts;
+  }
+
+  // Sombra directo en el canvas principal (sin capa aparte, que obligaba a pintar dos veces):
+  // 1) todo fuera del polígono, oscuro; 2) dentro del polígono, un degradado que oscurece el borde.
+  const SHADOW = 'rgba(3,4,10,0.9)';
+  function drawShadow(map, eye, R, camX, camY, sc) {
+    const pts = cachedVision(map, eye.x, eye.y, R);
+    const ox = cssW / 2 - camX * sc, oy = cssH / 2 - camY * sc;
+    const cx = eye.x * sc + ox, cy = eye.y * sc + oy, rr = R * sc;
+    const poly = () => {
+      ctx.moveTo(pts[0] * sc + ox, pts[1] * sc + oy);
+      for (let i = 2; i < pts.length; i += 2) ctx.lineTo(pts[i] * sc + ox, pts[i + 1] * sc + oy);
+      ctx.closePath();
+    };
+    ctx.save();
+    ctx.fillStyle = SHADOW;
+    ctx.beginPath(); ctx.rect(0, 0, cssW, cssH); poly();
+    ctx.fill('evenodd');
+    ctx.beginPath(); poly(); ctx.clip();
+    const grad = ctx.createRadialGradient(cx, cy, rr * 0.72, cx, cy, rr);
+    grad.addColorStop(0, 'rgba(3,4,10,0)');
+    grad.addColorStop(1, SHADOW);
+    ctx.fillStyle = grad;
+    const ext = visCache.R * sc + 2; // cubre todo el polígono guardado
+    ctx.fillRect(cx - ext, cy - ext, ext * 2, ext * 2);
+    ctx.restore();
+  }
+
+  // Centro de cada vista: el promedio del piso caminable alrededor de la cámara, para que no se
+  // vea media pantalla de pared o vacío (las cámaras están en pasillos). Se calcula una vez.
+  const camCenters = new Map();
+  function camCenter(map, cam) {
+    const key = map.id + ':' + cam.id;
+    let c = camCenters.get(key);
+    if (c) return c;
+    let sx = 0, sy = 0, n = 0;
+    for (let ty = Math.floor(cam.y - 3); ty <= Math.floor(cam.y + 3); ty++)
+      for (let tx = Math.floor(cam.x - 4.5); tx <= Math.floor(cam.x + 4.5); tx++)
+        if (!S.isSolidTile(map, tx, ty)) { sx += tx + 0.5; sy += ty + 0.5; n++; }
+    const mx = n ? sx / n : cam.x, my = n ? sy / n : cam.y;
+    // Sin alejarse demasiado de la cámara
+    c = { x: (cam.x + Math.max(-2, Math.min(2, mx - cam.x))) * T, y: (cam.y + Math.max(-1.2, Math.min(1.2, my - cam.y))) * T };
+    camCenters.set(key, c);
+    return c;
+  }
+
+  // ---------- Cámaras de seguridad: una vista del mundo en otro canvas ----------
+  // o: { map, cam:{x,y,name}, players, bodies, camsOn, dpr }
+  function cameraFeed(cv, o) {
+    const prev = ctx;
+    ctx = cv.getContext('2d');
+    const w = cv.width, h = cv.height, t = performance.now() / 1000;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = '#05070f'; ctx.fillRect(0, 0, w, h);
+    const sc = Math.min(w / (7.5 * T), h / (4.6 * T));
+    const { x: camX, y: camY } = camCenter(o.map, o.cam);
+    ctx.save();
+    ctx.translate(w / 2, h / 2); ctx.scale(sc, sc); ctx.translate(-camX, -camY);
+    const hw = w / 2 / sc, hh = h / 2 / sc;
+    const x0 = Math.floor((camX - hw) / T) - 1, x1 = Math.ceil((camX + hw) / T) + 1;
+    const y0 = Math.floor((camY - hh) / T) - 1, y1 = Math.ceil((camY + hh) / T) + 1;
+    const view = { x0: camX - hw - 80, x1: camX + hw + 80, y0: camY - hh - 80, y1: camY + hh + 80 };
+    drawMap(o.map, x0, y0, x1, y1);
+    drawRoomLights(o.map, x0, y0, x1, y1, t);
+    drawRoomLabels(o.map, x0, y0, x1, y1);
+    drawDecor(o.map, view);
+    drawCamDevices(o.map, view, o.camsOn, t);
+    drawStations(o.map, {}, view);
+    for (const b of o.bodies || []) if (inView(view, b.x, b.y)) drawBody(b.x, b.y, b.color, b);
+    const list = o.players.filter((p) => inView(view, p.x, p.y));
+    const items = decorDrawables(o.map, view, list.map((p) => ({ y: p.y, p })));
+    items.sort((a, b) => a.y - b.y);
+    for (const it of items) {
+      if (it.p) { const p = it.p; drawCrew(p.x, p.y, p.color, p.f, p.moving, t + p.id * 0.37, 1, false, p); }
+      else if (it.emergency) drawEmergency(o.map);
+      else { ctx.strokeStyle = OUTLINE; ctx.lineWidth = 4; drawItem(it.d, t); }
+    }
+    for (const p of list) drawName(p.x, p.y, p.name, false, false, null);
+    ctx.restore();
+    // Rayas de monitor, nombre y "REC"
+    const dp = o.dpr || 1;
+    ctx.fillStyle = 'rgba(120,255,180,0.06)';
+    for (let y = (t * 30 * dp) % (4 * dp); y < h; y += 4 * dp) ctx.fillRect(0, y, w, dp);
+    ctx.font = `${Math.round(13 * dp)}px "Luckiest Guy", system-ui, sans-serif`;
+    ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.lineJoin = 'round';
+    ctx.lineWidth = 4 * dp; ctx.strokeStyle = 'rgba(0,0,0,0.8)'; ctx.fillStyle = '#ffffff';
+    const label = o.cam.name.toUpperCase();
+    ctx.strokeText(label, 8 * dp, 7 * dp); ctx.fillText(label, 8 * dp, 7 * dp);
+    if (Math.sin(t * 4) > 0) {
+      ctx.fillStyle = '#ff3048';
+      ctx.beginPath(); ctx.arc(w - 14 * dp, 14 * dp, 5 * dp, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx = prev;
   }
 
   // Pantalla de expulsión: el expulsado flota por el espacio dando vueltas.
-  function ejectFrame(colorIdx, progress) {
+  function ejectFrame(colorIdx, progress, look) {
     const t = performance.now() / 1000;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     drawStars(t * 400, t * 30);
@@ -927,7 +1323,7 @@ window.Render = (function () {
     ctx.rotate(progress * Math.PI * 5);
     const s = Math.min(cssW, cssH) / 160;
     ctx.scale(s, s);
-    drawCrew(0, 0, colorIdx, 1, false, t, 1);
+    drawCrew(0, 0, colorIdx, 1, false, t, 1, false, look);
     ctx.restore();
   }
 
@@ -942,11 +1338,11 @@ window.Render = (function () {
     const s = (h / (S.PLAYER_RADIUS * 3.2)) * (opts.scale || 1);
     ctx.translate(opts.x != null ? opts.x : w / 2, h * 0.58);
     ctx.scale(s, s);
-    drawCrew(0, 0, colorIdx, opts.f || 1, false, performance.now() / 1000, opts.alpha == null ? 1 : opts.alpha, opts.dead);
+    drawCrew(0, 0, colorIdx, opts.f || 1, false, performance.now() / 1000, opts.alpha == null ? 1 : opts.alpha, opts.dead, opts.look);
     ctx = prev;
   }
 
-  // Varios tripulantes en fila en un canvas.
+  // Varios tripulantes en fila en un canvas. Cada uno: índice de color o { color, hat, outfit }.
   function crewRow(canvas2, colors) {
     const c2 = canvas2.getContext('2d');
     c2.setTransform(1, 0, 0, 1, 0, 0);
@@ -960,7 +1356,7 @@ window.Render = (function () {
       ctx.save();
       ctx.translate(w / 2 + (i - (n - 1) / 2) * gap, h * 0.6);
       ctx.scale(s, s);
-      drawCrew(0, 0, c, i < n / 2 ? 1 : -1, false, performance.now() / 1000 + i, 1);
+      drawCrew(0, 0, typeof c === 'object' ? c.color : c, i < n / 2 ? 1 : -1, false, performance.now() / 1000 + i, 1, false, typeof c === 'object' ? c : null);
       ctx.restore();
     });
     ctx = prev;
@@ -968,5 +1364,5 @@ window.Render = (function () {
 
   function viewSize() { const sc = worldScale(); return { w: cssW / sc, h: cssH / sc }; }
 
-  return { init, frame, ejectFrame, crewOn, crewRow, worldScale, burst, minimap, viewSize };
+  return { init, frame, ejectFrame, crewOn, crewRow, worldScale, burst, minimap, viewSize, cameraFeed };
 })();

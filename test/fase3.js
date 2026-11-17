@@ -1,6 +1,7 @@
 // Prueba de tareas, sabotajes y ventilaciones. 3 jugadores (1 impostor).
 const { io } = require('socket.io-client');
 const S = require('../shared/game.js');
+const Walk = require('./caminar.js');
 const URL = process.env.URL || 'http://localhost:3000';
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const ok = (cond, msg) => { if (!cond) { console.error('FALLA:', msg); process.exit(1); } console.log('ok -', msg); };
@@ -42,20 +43,8 @@ function path(fx, fy, tx, ty) {
   out.push([tx, ty]);
   return out;
 }
-async function walkTo(b, tx, ty) {
-  for (const [x, y] of path(b.x, b.y, tx, ty)) {
-    for (let i = 0; i < 80; i++) {
-      const dx = x - b.x, dy = y - b.y, d = Math.hypot(dx, dy);
-      if (d < 4) break;
-      const st = Math.min(12, d);
-      b.x += (dx / d) * st; b.y += (dy / d) * st;
-      b.s.emit('mov', { x: b.x, y: b.y, f: 1, m: 1 });
-      await wait(45);
-    }
-  }
-  b.s.emit('mov', { x: b.x, y: b.y, f: 1, m: 0 });
-  await wait(100);
-}
+// Camina esquivando paredes y objetos (ver caminar.js)
+async function walkTo(b, tx, ty) { await Walk.walkTo(MAP, b, tx, ty); }
 const at = (spot) => [spot.x * S.TILE, spot.y * S.TILE + 20];
 
 async function newGame(tasks) {

@@ -69,6 +69,11 @@
     return Number.isInteger(c) ? c : null;
   }
 
+  function preferredLook() {
+    const n = (k, list) => { const v = Number(store(k)); return Number.isInteger(v) && v >= 0 && v < list.length ? v : 0; };
+    return { hat: n('amogos.sombrero', S.HATS), outfit: n('amogos.outfit', S.OUTFITS) };
+  }
+
   function goFullscreen() {
     const el = document.documentElement;
     if (!document.fullscreenElement && el.requestFullscreen && matchMedia('(pointer: coarse)').matches) {
@@ -93,12 +98,12 @@
 
   $('btnCrear').onclick = () => {
     goFullscreen();
-    socket.emit('crear', { name: myName(), token, color: preferredColor() }, handleJoin);
+    socket.emit('crear', Object.assign({ name: myName(), token, color: preferredColor() }, preferredLook()), handleJoin);
   };
   function join(code) {
     if (!code || code.length !== 4) return showError('El código tiene 4 letras.');
     goFullscreen();
-    socket.emit('unirse', { code, name: myName(), token, color: preferredColor() }, handleJoin);
+    socket.emit('unirse', Object.assign({ code, name: myName(), token, color: preferredColor() }, preferredLook()), handleJoin);
   }
   $('btnUnirse').onclick = () => join($('codigo').value);
   $('codigo').addEventListener('keydown', (e) => { if (e.key === 'Enter') join($('codigo').value); });
@@ -139,8 +144,43 @@
       prompt('Copia este link:', url);
     }
   };
-  $('btnColor').onclick = () => { renderColors(); show('selectorColor', true); };
+  let charTab = 'colores';
+  $('btnColor').onclick = () => { renderCharacter(); show('selectorColor', true); };
   $('btnCerrarColor').onclick = () => show('selectorColor', false);
+  for (const b of document.querySelectorAll('.pestanas .opcion')) {
+    b.onclick = () => { charTab = b.dataset.tab; renderCharacter(); };
+  }
+  // Pestañas + vista previa grande + opciones (cada sombrero/outfit con su dibujito).
+  function renderCharacter() {
+    const me = game.room && game.room.players.find((p) => p.id === game.me);
+    if (!me) return;
+    for (const b of document.querySelectorAll('.pestanas .opcion')) b.classList.toggle('activa', b.dataset.tab === charTab);
+    for (const id of ['colores', 'sombreros', 'outfits']) show(id, id === charTab);
+    const vista = $('personajeVista');
+    Render.crewOn(vista, me.color, { look: me, scale: 0.95 });
+    if (charTab === 'colores') return renderColors();
+    const isHat = charTab === 'sombreros';
+    const list = isHat ? S.HATS : S.OUTFITS;
+    const box = $(charTab);
+    box.innerHTML = '';
+    list.forEach((name, i) => {
+      const b = document.createElement('button');
+      b.className = 'accesorio' + ((isHat ? me.hat : me.outfit) === i ? ' mio' : '');
+      b.setAttribute('aria-label', name);
+      const cv = document.createElement('canvas');
+      cv.width = 92; cv.height = 92;
+      const look = isHat ? { hat: i, outfit: 0 } : { hat: 0, outfit: i };
+      Render.crewOn(cv, me.color, { look, scale: isHat ? 0.78 : 0.95 });
+      const l = document.createElement('span');
+      l.textContent = name;
+      b.append(cv, l);
+      b.onclick = () => {
+        store(isHat ? 'amogos.sombrero' : 'amogos.outfit', String(i));
+        socket.emit('look', isHat ? { hat: i } : { outfit: i });
+      };
+      box.appendChild(b);
+    });
+  }
   $('btnAjustes').onclick = () => { renderSettings(); show('ajustes', true); };
   $('btnCerrarAjustes').onclick = () => show('ajustes', false);
   $('btnEmpezar').onclick = () => socket.emit('empezar', (res) => { if (res && res.error) toast(res.error); });
@@ -277,7 +317,7 @@
   function updateInputEnabled() {
     const r = game.room;
     const ok = !!r && (r.phase === 'lobby' || r.phase === 'juego') && performance.now() >= game.frozenUntil &&
-      document.activeElement !== $('chatInput') && !Tasks.isOpen() && !(r.me && r.me.inVent);
+      document.activeElement !== $('chatInput') && !Tasks.isOpen() && !(r.me && r.me.inVent) && !game.watching;
     Input.setEnabled(ok);
   }
 
@@ -300,6 +340,8 @@
       }
       p.name = rp.name;
       p.color = rp.color;
+      p.hat = rp.hat || 0;
+      p.outfit = rp.outfit || 0;
       p.conn = rp.conn;
       p.alive = rp.alive !== false;
       p.role = rp.role;
@@ -328,6 +370,9 @@
       if (!stillOk) Tasks.close(true);
     }
     if (room.phase !== 'juego') show('menuSabotaje', false);
+    // (el servidor tarda un instante en confirmar que miras: 1 s de gracia al abrir)
+    if (game.watching && !(room.phase === 'juego' && room.me && room.me.alive && (room.me.watching || now - game.watchingSince < 1000))) closeCameras(false);
+    if (!$('selectorColor').classList.contains('oculto')) renderCharacter();
     if (prevPhase !== room.phase) game.phaseStartedAt = now;
 
     // Mensajes de sistema al empezar una reunión
@@ -455,7 +500,7 @@
     const k = e.key.toLowerCase();
     if (k === 'm' || k === 'tab') { e.preventDefault(); setBigMap(!bigMapOpen); return; }
     if (k === 'escape') {
-      if (Tasks.isOpen()) Tasks.close(); else if (bigMapOpen) setBigMap(false); else show('menuSabotaje', false);
+      if (Tasks.isOpen()) Tasks.close(); else if (game.watching) closeCameras(); else if (bigMapOpen) setBigMap(false); else show('menuSabotaje', false);
       return;
     }
     const id = KEYS[k];
@@ -709,7 +754,7 @@
       const cv = document.createElement('canvas');
       cv.width = 40; cv.height = 40;
       cv.style.width = '34px'; cv.style.height = '34px';
-      Render.crewOn(cv, p.color, { dead: !alive, scale: 1.15 });
+      Render.crewOn(cv, p.color, { dead: !alive, scale: 1.15, look: p });
       const name = document.createElement('span');
       name.className = 'nombre';
       name.textContent = p.name + (p.id === game.me ? ' (tú)' : '');
@@ -799,7 +844,7 @@
     $('finSub').textContent = `${crewWin ? 'Ganan los tripulantes' : 'Ganan los impostores'}. ${e.reason} ` +
       `Impostor${imps.length === 1 ? '' : 'es'}: ${imps.map((p) => p.name).join(', ') || '—'}.`;
     const winners = game.room.players.filter((p) => (p.role === 'impostor') !== crewWin);
-    Render.crewRow($('finLienzo'), winners.map((p) => p.color));
+    Render.crewRow($('finLienzo'), winners);
     if (renderEnd.shownFor !== game.phaseStartedAt) {
       renderEnd.shownFor = game.phaseStartedAt;
       if (iWon) confetti(); else $('confeti').innerHTML = '';
@@ -827,7 +872,7 @@
     }
     const team = imp ? room.players.filter((p) => p.role === 'impostor') : room.players;
     const mine = room.players.find((p) => p.id === game.me);
-    const colors = [mine.color, ...team.filter((p) => p.id !== game.me).map((p) => p.color)];
+    const colors = [mine, ...team.filter((p) => p.id !== game.me)]; // con sombrero y outfit
     Render.crewRow($('revelacionLienzo'), colors);
     $('revelacion').className = 'cartel ' + (imp ? 'rol-impostor' : 'rol-tripulante');
     show('revelacion', true);
@@ -865,6 +910,7 @@
     const u = target.use;
     if (!u) return;
     if (u.kind === 'emergencia') socket.emit('emergencia');
+    else if (u.kind === 'camaras') openCameras();
     else if (u.kind === 'luces') {
       Tasks.open('interruptores', { kind: 'luces', title: 'Arreglar luces', hint: 'Enciende todos los interruptores para volver a tener luz.',
         onDone: () => socket.emit('arreglarLuces'), onClose: () => updateInputEnabled() });
@@ -884,6 +930,41 @@
     }
     updateInputEnabled();
   };
+
+  // ---------- Cámaras de seguridad ----------
+  let lastCamDraw = 0;
+  function openCameras() {
+    if (!game.map.cameras) return;
+    game.watching = true;
+    game.watchingSince = performance.now();
+    lastCamDraw = 0;
+    socket.emit('camaras', true);
+    show('camaras', true);
+    updateInputEnabled();
+  }
+  function closeCameras(tellServer) {
+    if (!game.watching) return;
+    game.watching = false;
+    if (tellServer !== false) socket.emit('camaras', false);
+    show('camaras', false);
+    updateInputEnabled();
+  }
+  $('btnCerrarCamaras').onclick = () => closeCameras();
+  function drawCameras(now) {
+    if (!game.watching || now - lastCamDraw < 80) return; // ~12 cuadros/s: suficiente y barato
+    lastCamDraw = now;
+    const room = game.room;
+    const dp = Math.min(window.devicePixelRatio || 1, 2);
+    const players = [...game.players.values()].filter((p) => p.alive || !(room.me && room.me.alive));
+    const cvs = document.querySelectorAll('#camaras .camara');
+    game.map.cameras.cams.forEach((cam, i) => {
+      const cv = cvs[i];
+      if (!cv) return;
+      const w = Math.round(cv.clientWidth * dp), h = Math.round(cv.clientHeight * dp);
+      if (w > 0 && h > 0 && (cv.width !== w || cv.height !== h)) { cv.width = w; cv.height = h; }
+      Render.cameraFeed(cv, { map: game.map, cam, players, bodies: room.bodies, camsOn: true, dpr: dp });
+    });
+  }
 
   function updateActions(now) {
     const room = game.room, me = meP();
@@ -919,6 +1000,8 @@
         }
         if (best) target.use = { kind: 'tarea', id: best };
       }
+      const cams = game.map.cameras;
+      if (!target.use && room.me.alive && cams && dist(cams.panel) <= S.USE_RANGE) target.use = { kind: 'camaras' };
     }
     if (!room.me.alive) {
       $('btnUsar').disabled = !target.use;
@@ -1035,7 +1118,9 @@
     } else if (room && room.phase === 'expulsion') {
       const r = room.meeting && room.meeting.result;
       const prog = Math.min(1, (now - game.phaseStartedAt) / 5500);
-      Render.ejectFrame(r && r.ejectedId != null ? r.ejectedColor : null, prog);
+      Render.ejectFrame(r && r.ejectedId != null ? r.ejectedColor : null, prog, r && r.ejectedLook);
+    } else if (game.watching) {
+      // Las cámaras tapan casi toda la pantalla: no se redibuja el mundo detrás.
     } else {
       const hostId = room ? room.hostId : null;
       const myRole = room && room.me ? room.me.role : null;
@@ -1054,6 +1139,9 @@
         for (const s of spots) if (s) arrows.push({ x: s.x * S.TILE, y: s.y * S.TILE });
       }
       Render.frame({
+        eye: me ? { x: me.x, y: me.y } : null,
+        meId: game.me,
+        camsOn: playing && !!room.camsOn,
         map: game.map,
         camX: game.camX,
         camY: game.camY,
@@ -1077,6 +1165,7 @@
       });
     }
     drawMaps(now);
+    drawCameras(now);
     requestAnimationFrame(loop);
   }
 

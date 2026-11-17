@@ -1119,3 +1119,52 @@ input { border-radius: var(--chueco2); border: 3px solid #4a5590; }
    Ahora es un "pop" de una sola vez al activarse el botón (avisa igual, sin costo después). */
 .btn-accion:not(:disabled) .ico, .btn-matar:not(:disabled) .ico { animation: pop .45s cubic-bezier(.2, 1.6, .4, 1); }
 @keyframes pop { 0% { transform: scale(.55) rotate(-10deg); } 100% { transform: none; } }
+
+/* ---------- Fase 9: bordes que no cubrían toda la tarjeta ----------
+   Antes la tarjeta tenía su propio scroll: el borde dibujado (::before) medía solo la parte visible
+   y se iba con el scroll (Ajustes). Ahora la tarjeta crece con su contenido (el borde la cubre entera)
+   y lo que hace scroll es la capa de atrás. margin:auto centra, y si no cabe se pega arriba sin cortarse. */
+.pantalla, .modal { overflow-y: auto; overscroll-behavior: contain; }
+.pantalla > .tarjeta, .modal > .tarjeta { margin: auto; max-height: none; overflow: visible; flex: none; }
+.tarjeta-tarea { max-height: none; }
+/* Pantallas muy bajas: los minijuegos se compactan para caber sin scroll */
+@media (max-height: 370px) {
+  .modal-tarea { padding: 6px; }
+  .tarjeta-tarea { padding: 8px 12px; gap: 5px; }
+  .tarea-cabeza h2 { font-size: 15px; }
+  .tarea-contenido { gap: 6px; }
+  .tarea-pista { font-size: 12px; }
+  .cables-col { gap: 6px; }
+  .cable { height: 26px; }
+  .sec-grid { grid-template-columns: repeat(3, 44px); gap: 5px; }
+  .sec-pad { height: 44px; }
+  .onda { max-width: 340px; }
+  .deslizador input { height: 24px; }
+  .ord-caja { height: 128px; }
+  .interruptor { height: 66px; }
+  .mano { width: 104px; height: 104px; }
+}
+
+/* ---------- Fase 9: personaje (color, sombrero, outfit) ---------- */
+.tarjeta-personaje { width: min(620px, 100%); }
+.personaje { display: flex; gap: 14px; align-items: center; }
+.personaje-vista { width: 130px; height: 156px; flex: none; background: radial-gradient(circle at 50% 60%, rgba(120, 160, 255, .25), transparent 70%); }
+.personaje-opciones { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.pestanas { display: flex; gap: 6px; }
+.pestanas .opcion { flex: 1; }
+.accesorios { display: grid; grid-template-columns: repeat(auto-fill, minmax(62px, 1fr)); gap: 6px; }
+.accesorio { position: relative; padding: 0; height: 64px; border: 3px solid var(--tinta); border-radius: var(--chueco2); background: rgba(20, 25, 48, .9); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; color: #dfe5ff; font: 700 10px/1.1 system-ui, sans-serif; }
+.accesorio canvas { width: 46px; height: 46px; }
+.accesorio span { padding-bottom: 3px; white-space: nowrap; overflow: hidden; max-width: 100%; text-overflow: ellipsis; }
+.accesorio.mio { background: #f0a91c; color: var(--tinta); }
+@media (max-height: 430px) {
+  .personaje-vista { width: 100px; height: 120px; }
+  .accesorio { height: 56px; }
+  .accesorio canvas { width: 38px; height: 38px; }
+}
+
+/* ---------- Fase 9: cámaras de seguridad ---------- */
+.modal-camaras { z-index: 26; padding: 6px; }
+.tarjeta-camaras { width: min(860px, 100%); gap: 6px; padding: 10px 12px; }
+.camaras-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.camara { width: 100%; height: auto; aspect-ratio: 320 / 196; display: block; border: 3px solid var(--tinta); border-radius: 8px; background: #05070f; max-height: calc((100vh - 70px) / 2); object-fit: contain; }

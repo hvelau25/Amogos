@@ -46,6 +46,11 @@ function cleanName(n) {
   n = String(n || '').replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, S.NAME_MAX);
   return n || 'Tripulante';
 }
+// Sombrero/outfit: índice válido o 0 (nada).
+function cleanLook(v, list) {
+  v = Number(v);
+  return Number.isInteger(v) && v >= 0 && v < list.length ? v : 0;
+}
 function cleanToken(t) {
   t = String(t || '');
   return /^[a-zA-Z0-9_-]{8,64}$/.test(t) ? t : null;
@@ -65,7 +70,7 @@ function stateFor(room, viewer) {
   for (const p of room.players.values()) {
     if (inMatch(room) && !p.alive && !viewerKnowsDead) continue; // los vivos no ven fantasmas
     if (p.inVent && p.id !== viewer.id) continue; // nadie ve a quien está en una ventilación
-    const out = { id: p.id, name: p.name, color: p.color, x: p.x, y: p.y, f: p.f, conn: p.connected };
+    const out = { id: p.id, name: p.name, color: p.color, hat: p.hat, outfit: p.outfit, x: p.x, y: p.y, f: p.f, conn: p.connected };
     if (inMatch(room)) {
       out.alive = p.alive;
       if (showAll || p.id === viewer.id || (viewer.role === 'impostor' && p.role === 'impostor')) out.role = p.role;
@@ -101,6 +106,8 @@ function stateFor(room, viewer) {
       }
     }
     st.emergencyIn = Math.max(0, room.emergencyReadyAt - now);
+    st.camsOn = [...room.players.values()].some((q) => q.watching && q.alive && q.connected);
+    st.me.watching = !!viewer.watching;
     st.impostorCount = room.impostorTotal;
   }
   if (room.meeting) {
@@ -146,7 +153,7 @@ function placeAll(room, onlyAlive) {
   });
 }
 
-function addPlayer(room, socket, name, token, preferredColor) {
+function addPlayer(room, socket, name, token, preferredColor, look) {
   const map = S.MAPS[room.map];
   const sp = S.spawnPoint(map, room.players.size, room.players.size + 1);
   const p = {
@@ -155,6 +162,9 @@ function addPlayer(room, socket, name, token, preferredColor) {
     socketId: socket.id,
     name,
     color: freeColor(room, preferredColor),
+    hat: cleanLook(look && look.hat, S.HATS),
+    outfit: cleanLook(look && look.outfit, S.OUTFITS),
+    watching: false,
     x: sp.x,
     y: sp.y,
     f: 1,
@@ -289,6 +299,7 @@ function startGame(room) {
     p.killReadyAt = now + ROLE_REVEAL_MS + FIRST_KILL_COOLDOWN * 1000;
     p.emergenciesLeft = room.settings.emergencies;
     p.inVent = null;
+    p.watching = false;
     assignTasks(room, p); // los impostores reciben una lista falsa para disimular
     const sock = io.sockets.sockets.get(p.socketId);
     if (sock) sock.leave(deadRoom(room));
@@ -324,6 +335,7 @@ function backToLobby(room) {
     p.alive = true;
     p.tasks = [];
     p.inVent = null;
+    p.watching = false;
     const sock = io.sockets.sockets.get(p.socketId);
     if (sock) sock.leave(deadRoom(room));
   }
@@ -360,8 +372,9 @@ function killPlayer(room, victim, leaveBody) {
   victim.alive = false;
   victim.moving = false;
   victim.inVent = null;
+  victim.watching = false;
   releaseHands(room, victim);
-  if (leaveBody) room.bodies.push({ id: victim.id, color: victim.color, x: Math.round(victim.x), y: Math.round(victim.y) });
+  if (leaveBody) room.bodies.push({ id: victim.id, color: victim.color, hat: victim.hat, outfit: victim.outfit, x: Math.round(victim.x), y: Math.round(victim.y) });
   const sock = io.sockets.sockets.get(victim.socketId);
   if (sock) sock.join(deadRoom(room));
 }
@@ -380,7 +393,7 @@ function startMeeting(room, caller, reason, bodyId) {
   };
   room.chat = [];
   if (room.sabotage && room.sabotage.kind === 'reactor') clearSabotage(room);
-  for (const p of room.players.values()) { p.moving = false; p.inVent = null; p.taskOpen = null; }
+  for (const p of room.players.values()) { p.moving = false; p.inVent = null; p.taskOpen = null; p.watching = false; }
   sendRoom(room);
   setTimer(room, room.settings.discussion * 1000, () => startVoting(room));
 }
@@ -426,6 +439,7 @@ function finishVoting(room) {
     ejectedId: ejected ? ejected.id : null,
     ejectedName: ejected ? ejected.name : null,
     ejectedColor: ejected ? ejected.color : null,
+    ejectedLook: ejected ? { hat: ejected.hat, outfit: ejected.outfit } : null,
     wasImpostor: ejected ? ejected.role === 'impostor' : null,
     impostorsLeft: impLeft,
   };
@@ -481,7 +495,7 @@ io.on('connection', (socket) => {
       sabotage: null, sabTimer: null, sabotageReadyAt: 0,
     };
     rooms.set(code, room);
-    const p = addPlayer(room, socket, cleanName(msg.name), token, msg.color);
+    const p = addPlayer(room, socket, cleanName(msg.name), token, msg.color, msg);
     bindSocket(socket, room, p);
     ack({ ok: true, me: p.id, room: stateFor(room, p), chat: [] });
   });
@@ -513,7 +527,7 @@ io.on('connection', (socket) => {
 
     if (room.phase !== 'lobby') return ack({ ok: false, error: 'La partida ya empezó. Espera a la siguiente.' });
     if (room.players.size >= S.MAX_PLAYERS) return ack({ ok: false, error: 'La sala está llena (máx. 12).' });
-    const p = addPlayer(room, socket, cleanName(msg.name), token, msg.color);
+    const p = addPlayer(room, socket, cleanName(msg.name), token, msg.color, msg);
     bindSocket(socket, room, p);
     ack({ ok: true, me: p.id, room: stateFor(room, p), chat: [] });
     sendRoom(room);
@@ -526,6 +540,27 @@ io.on('connection', (socket) => {
     if (!Number.isInteger(c) || c < 0 || c >= S.COLORS.length) return;
     if ([...room.players.values()].some((q) => q.id !== p.id && q.color === c)) return;
     p.color = c;
+    sendRoom(room);
+  });
+
+  // Sombrero y outfit (solo en el lobby)
+  socket.on('look', (msg) => {
+    const { room, p } = current(socket);
+    if (!room || room.phase !== 'lobby' || !msg) return;
+    if (msg.hat !== undefined) p.hat = cleanLook(msg.hat, S.HATS);
+    if (msg.outfit !== undefined) p.outfit = cleanLook(msg.outfit, S.OUTFITS);
+    sendRoom(room);
+  });
+
+  // Cámaras de seguridad: mirar desde el panel. Mientras alguien mira, las cámaras prenden su luz roja.
+  socket.on('camaras', (on) => {
+    const { room, p } = current(socket);
+    if (!room || room.phase !== 'juego' || !p.alive) return;
+    const cams = S.MAPS[room.map].cameras;
+    if (on && (!cams || p.inVent || !near(p, cams.panel, S.USE_RANGE))) return;
+    if (p.watching === !!on) return;
+    p.watching = !!on;
+    p.moving = false;
     sendRoom(room);
   });
 
@@ -559,6 +594,7 @@ io.on('connection', (socket) => {
       dy = (dy / d) * maxStep;
     }
     if (p.inVent) return void socket.emit('corr', { x: p.x, y: p.y });
+    if (p.watching && m.m) { p.watching = false; sendRoom(room); }
     const ghost = inMatch(room) && !p.alive;
     const res = S.move(S.MAPS[room.map], p.x, p.y, dx, dy, S.PLAYER_RADIUS, ghost);
     p.x = res.x;
@@ -742,6 +778,7 @@ io.on('connection', (socket) => {
       const v = vents.find((q) => near(p, q, S.USE_RANGE));
       if (!v) return;
       p.inVent = v.id;
+      p.watching = false;
       p.x = v.x * S.TILE;
       p.y = v.y * S.TILE;
       p.moving = false;

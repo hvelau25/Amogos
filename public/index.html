@@ -103,7 +103,7 @@
 
     <div id="panelLobby" class="panel-lobby oculto">
       <button id="btnCompartir" class="btn btn-chico">Invitar</button>
-      <button id="btnColor" class="btn btn-chico">Color</button>
+      <button id="btnColor" class="btn btn-chico">Personaje</button>
       <button id="btnAjustes" class="btn btn-chico">Ajustes</button>
       <button id="btnEmpezar" class="btn btn-chico btn-verde oculto">Empezar</button>
       <span id="esperaHost" class="chip oculto">Esperando al host…</span>
@@ -221,12 +221,40 @@
     </div>
   </section>
 
-  <!-- Selector de color -->
+  <!-- Personaje: color, sombrero y outfit -->
   <section id="selectorColor" class="modal oculto">
-    <div class="tarjeta">
-      <h2>Elige tu color</h2>
-      <div id="colores" class="colores"></div>
+    <div class="tarjeta tarjeta-personaje">
+      <h2>Tu personaje</h2>
+      <div class="personaje">
+        <canvas id="personajeVista" class="personaje-vista" width="200" height="240"></canvas>
+        <div class="personaje-opciones">
+          <div class="pestanas" role="tablist">
+            <button class="opcion activa" data-tab="colores">Color</button>
+            <button class="opcion" data-tab="sombreros">Sombrero</button>
+            <button class="opcion" data-tab="outfits">Outfit</button>
+          </div>
+          <div id="colores" class="colores"></div>
+          <div id="sombreros" class="accesorios oculto"></div>
+          <div id="outfits" class="accesorios oculto"></div>
+        </div>
+      </div>
       <button id="btnCerrarColor" class="btn">Listo</button>
+    </div>
+  </section>
+
+  <!-- Cámaras de seguridad -->
+  <section id="camaras" class="modal modal-camaras oculto">
+    <div class="tarjeta tarjeta-camaras">
+      <div class="tarea-cabeza">
+        <h2>Cámaras de seguridad</h2>
+        <button id="btnCerrarCamaras" class="btn-icono btn-icono-chico" aria-label="Cerrar cámaras"><svg class="icono" aria-hidden="true"><use href="#ic-cerrar"/></svg></button>
+      </div>
+      <div class="camaras-grid">
+        <canvas class="camara" width="320" height="196"></canvas>
+        <canvas class="camara" width="320" height="196"></canvas>
+        <canvas class="camara" width="320" height="196"></canvas>
+        <canvas class="camara" width="320" height="196"></canvas>
+      </div>
     </div>
   </section>
 
