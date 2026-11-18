@@ -38,7 +38,7 @@ Juego multijugador para jugar con amigos en ratos libres en la uni. Modo clásic
 6. [x] Minimapa, diseño y animación (falta probar en celulares y subir)
 7. [x] Tareas por etapas, tareas difíciles, íconos propios y teclas (falta subir)
 8. [x] Rendimiento y fluidez, verificado (falta subir y probar en celulares reales)
-9. [x] Bordes, sombreros/outfits, cámaras, objetos sólidos, vista y paredes que tapan (verificado 2026-11-17; falta subir)
+9. [x] Bordes, sombreros/outfits, cámaras, objetos sólidos, vista y paredes que tapan (verificado y subido 2026-11-17)
 
 ## Estado (2026-11-11)
 Fase 1 terminada y probada (prueba automática + navegador en tamaño de celular horizontal): crear sala o unirse por link/código, lobby con colores únicos, hasta 12 jugadores, host con estrella, Empezar → Estación Orbital, Volver al lobby, reconexión, choques con paredes, joystick táctil + WASD. Probado después en celulares reales (ver "Prueba real").
@@ -175,4 +175,32 @@ Pedido del usuario: bugs de bordes, sombreros y outfits, cámaras de seguridad, 
   - Rendimiento: la sombra de visión ahora se pinta directo en el canvas principal (relleno par-impar + degradado recortado al polígono) en vez de una capa aparte con `drawImage`, y el polígono se guarda y solo se recalcula si el ojo se mueve. Comparación A/B el mismo día (CPU x6, 12 jugadores): la versión anterior (commit 5832c23) dio 55-58 FPS y la actual 57-60 FPS; con partículas, 44-53 vs 49-56. O sea, la Fase 9 no empeoró nada. Las cifras absolutas varían mucho según la carga de la PC (la Fase 8 marcó 60 FPS estables otro día con el mismo código).
   - Pruebas: pasan mapas, humo, fase9 y fase3 (ambos mapas), partida y fugas (+158 KB, 2 nodos, 0 listeners).
   - **Ojo en Playwright:** el botón Empezar se anima sin parar y `page.click` nunca lo ve "estable"; pulsarlo con `page.evaluate(() => document.getElementById('btnEmpezar').click())`.
-  - **Pendiente:** subir a GitHub/Render cuando el usuario diga (un push reinicia Render y borra salas) y probar en celulares reales (visión con paredes, cámaras, sombreros).
+  - **Subido (2026-11-17):** commit dc6526a en main. Render redesplegó en ~30 s; los archivos servidos son idénticos a los locales y `test/humo.js` pasa contra el link (la primera corrida, justo al terminar el deploy, falló; la segunda pasó 12/12).
+  - **Pendiente:** probar en celulares reales (visión con paredes, cámaras, sombreros).
+
+## Jerseys de la Liga MX (2026-11-17)
+Pedido del usuario: jerseys de la Liga MX como outfits, con los diseños actuales.
+- Se investigaron los uniformes de local del **Apertura 2026** (Récord, Excélsior, Mediotiempo, Fox Sports, julio 2026). Los 18 equipos: América, Atlante (regresó y tomó el lugar de Mazatlán), Atlas, San Luis, Chivas, Cruz Azul, Juárez, León, Monterrey, Necaxa, Pachuca, Puebla, Pumas, Querétaro, Santos, Tijuana, Tigres y Toluca.
+- Datos en `shared/game.js` → `JERSEYS` (color base, patrón, cuello, mangas, filo) y se agregan a `OUTFITS` desde el índice `JERSEY_FIRST = 8`. El servidor los valida solo (por el largo de la lista).
+- Dibujo: `drawJersey` en render.js, llamado dentro de `drawCrew` sobre el cuerpo y debajo del casco; con jersey no se dibuja el cinturón. **Decisión:** el jersey cubre el torso hasta 0,56 radios y abajo queda una franja de short, más las piernas y la antena, del color del jugador, para que se le siga reconociendo (el color es clave para acusar). Con 0,4 casi no se veía porque el casco tapa la parte de arriba.
+- **Sin escudos ni patrocinadores**: solo colores y patrones (franjas, mitades, banda diagonal, aros, franja central, rayos en zigzag, rayitas, rombos discretos, "X"). A ese tamaño no se distinguirían y así se evitan logos de marcas.
+- Datos inciertos: Tijuana no se había presentado en julio; se usó rojo con "X" oscura (estilo Reebok con X/TJ). Necaxa: Excélsior dice líneas rojas y Récord dice rayos; se usaron rayos. Atlante: franjas azul y grana con cuello polo.
+- Probado: capturas de los 26 outfits y del selector sin errores; pasan mapas, humo, fase9 y partida. Si se quieren más colores (visitante), se agregan como entradas nuevas en `JERSEYS`.
+- Sin subir todavía.
+
+## Pantalla completa en celular (2026-11-17)
+Pedido del usuario: que en celular se ponga solo en pantalla completa y horizontal.
+- Antes solo se pedía al tocar Crear/Unirse; si recargabas, reconectabas o te salías, ya no volvía.
+- Ahora (`goFullscreen` en main.js): en celulares (`pointer: coarse`) **cada toque** pide pantalla completa mientras no lo esté, y luego bloquea la orientación en horizontal (`screen.orientation.lock`). No se pide al tocar campos de texto (para no estorbar al teclado) ni el botón Invitar (el menú de compartir necesita ese mismo toque). En PC no hace nada.
+- Los navegadores solo dejan entrar a pantalla completa dentro de un toque; no se puede hacer al cargar la página.
+- **iPhone:** Safari no permite pantalla completa ni bloquear la orientación en páginas web. Se muestra en el menú "Pantalla completa en iPhone: Compartir → Agregar a inicio" (solo en iPhone y si no está ya instalada). Instalada desde inicio abre en pantalla completa y horizontal por el manifest. Si está en vertical durante la partida, sigue saliendo el aviso de girar.
+- Probado con Android, iPhone y PC emulados: entra al primer toque, vuelve tras salirse, el aviso solo sale en iPhone. El bloqueo de orientación no se puede probar en el emulador; falta probarlo en un Android real.
+
+## Escena de muerte (2026-11-17)
+Hecha en la sesión anterior (que se quedó sin contexto antes de anotarla); verificada en esta.
+- Al morir, la víctima ve un panel tipo cómic de ~2,7 s (`Render.killScene`, `KILL_KINDS`, `KILL_LEN` en render.js; `playKillScene` en main.js) con el impostor (su color, sombrero y outfit) atacándola. 4 variantes al azar: **cuchillo** (¡ZAS!), **mordida** (boca que sale del impostor, ¡ÑAM!), **rayo** (pistola eléctrica, queda carbonizada, ¡BZZT!) y **llave** (golpe con llave inglesa, ¡PUM!). Después sale el aviso "TE MATARON" de siempre.
+- Sonidos nuevos sintetizados en audio.js (swoosh, mordida, carga, rayo, salto, golpe), sincronizados por tiempo; vibración al momento del golpe.
+- El servidor ahora manda `killerHat` y `killerOutfit` en el evento `muerte`. Si empieza una reunión mientras se ve, se corta.
+- Prueba en consola: `__amogos.killScene(0..3)`.
+- Probado: capturas de las 4 variantes en 5 momentos, sin errores de consola. Pasan mapas, humo, partida, fase9 (ambos mapas) y fase3 (ambos mapas). fase3 falló una vez por mapa en "etapa 1/2 de cad_datos" y pasó al repetir: es el bot de prueba que a veces no llega a la estación, no el juego (el código de tareas no cambió).
+- Sin subir todavía (junto con jerseys y pantalla completa).

@@ -84,6 +84,7 @@
         </div>
       </div>
       <p id="error" class="error" role="alert"></p>
+      <p id="avisoIos" class="aviso-ios oculto">Pantalla completa en iPhone: <b>Compartir → Agregar a inicio</b></p>
     </div>
   </section>
 
@@ -203,6 +204,11 @@
     <p id="revelacionTitulo" class="cartel-titulo"></p>
     <canvas id="revelacionLienzo" width="560" height="140"></canvas>
     <p id="revelacionTexto" class="cartel-sub"></p>
+  </section>
+
+  <!-- Escena de muerte (solo la ve la víctima) -->
+  <section id="escenaMuerte" class="escena-muerte oculto" aria-hidden="true">
+    <canvas id="escenaCanvas" width="600" height="280"></canvas>
   </section>
 
   <section id="muerteAviso" class="cartel cartel-rojo oculto">

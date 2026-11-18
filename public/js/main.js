@@ -74,14 +74,36 @@
     return { hat: n('amogos.sombrero', S.HATS), outfit: n('amogos.outfit', S.OUTFITS) };
   }
 
+  // Celular: pantalla completa + horizontal. El navegador solo lo permite dentro de un toque, así que se
+  // intenta en cada toque mientras no esté en pantalla completa (sirve al recargar, reconectar o si alguien
+  // se sale). iPhone no lo permite en páginas web: ahí se avisa que lo agreguen a inicio (ver iosHint).
+  const isMobile = matchMedia('(pointer: coarse)').matches;
+  const lockLandscape = () => {
+    if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {});
+  };
   function goFullscreen() {
+    if (!isMobile) return;
     const el = document.documentElement;
-    if (!document.fullscreenElement && el.requestFullscreen && matchMedia('(pointer: coarse)').matches) {
-      el.requestFullscreen({ navigationUI: 'hide' }).then(() => {
-        if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {});
-      }).catch(() => {});
-    }
+    if (document.fullscreenElement || document.webkitFullscreenElement) return lockLandscape();
+    const req = el.requestFullscreen || el.webkitRequestFullscreen;
+    if (!req) return;
+    try {
+      const p = req.call(el, { navigationUI: 'hide' });
+      if (p && p.then) p.then(lockLandscape).catch(() => {});
+      else setTimeout(lockLandscape, 300);
+    } catch (e) { /* sin permiso: se reintenta en el siguiente toque */ }
   }
+  document.addEventListener('pointerup', (e) => {
+    const t = e.target;
+    // Los campos de texto abren el teclado, e Invitar necesita el toque para abrir "compartir".
+    if (t.closest && (t.closest('input, textarea') || t.closest('#btnCompartir'))) return;
+    goFullscreen();
+  }, true);
+  (function iosHint() {
+    const ios = /iPhone|iPod/.test(navigator.userAgent);
+    const installed = navigator.standalone || matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches;
+    if (ios && !installed) show('avisoIos', true);
+  })();
 
   function handleJoin(res) {
     if (!res || !res.ok) return showError((res && res.error) || 'No se pudo conectar.');
@@ -879,12 +901,49 @@
     setTimeout(() => { show('revelacion', false); updateInputEnabled(); }, 3800);
   });
 
-  socket.on('muerte', () => {
-    Sound.play('muerte');
-    show('muerteAviso', true);
-    if (navigator.vibrate) navigator.vibrate([200, 80, 200]);
-    setTimeout(() => show('muerteAviso', false), 3000);
+  socket.on('muerte', (d) => {
+    d = d || {};
+    const me = game.room && game.room.players.find((p) => p.id === game.me);
+    const victim = me ? { color: me.color, hat: me.hat, outfit: me.outfit } : { color: 0 };
+    const killer = { color: d.killerColor || 0, hat: d.killerHat || 0, outfit: d.killerOutfit || 0 };
+    playKillScene(Math.floor(Math.random() * Render.KILL_KINDS.length), killer, victim, () => {
+      Sound.play('muerte');
+      show('muerteAviso', true);
+      setTimeout(() => show('muerteAviso', false), 3000);
+    });
   });
+
+  // Escena de muerte: ~2,7 s con el impostor atacando (4 variantes al azar). Sonidos sincronizados.
+  const KILL_SOUNDS = {
+    cuchillo: [[0.68, 'swoosh'], [0.85, 'matar']],
+    mordida: [[0.45, 'pop'], [0.9, 'swoosh'], [1.05, 'mordida']],
+    rayo: [[0.5, 'carga'], [0.8, 'rayo']],
+    llave: [[0.42, 'salto'], [1.0, 'golpe']],
+  };
+  let killAnim = 0;
+  function playKillScene(kind, killer, victim, done) {
+    cancelAnimationFrame(killAnim);
+    const cv = $('escenaCanvas');
+    show('escenaMuerte', true);
+    const dp = Math.min(window.devicePixelRatio || 1, 2.5);
+    const cw = Math.max(300, cv.clientWidth || 600);
+    cv.width = Math.round(cw * dp); cv.height = Math.round((cw * dp * 280) / 600);
+    const name = Render.KILL_KINDS[kind];
+    const sounds = KILL_SOUNDS[name].slice();
+    const t0 = performance.now();
+    let vibrated = false;
+    const step = () => {
+      const t = (performance.now() - t0) / 1000;
+      const phase = game.room && game.room.phase;
+      if (t >= Render.KILL_LEN || (phase && phase !== 'juego')) { show('escenaMuerte', false); done(); return; }
+      const { hit } = Render.killScene(cv, { kind, killer, victim }, t);
+      while (sounds.length && t >= sounds[0][0]) Sound.play(sounds.shift()[1]);
+      if (!vibrated && t >= hit) { vibrated = true; if (navigator.vibrate) navigator.vibrate([180, 60, 120]); }
+      killAnim = requestAnimationFrame(step);
+    };
+    step();
+  }
+  game.killScene = (kind) => playKillScene(kind || 0, { color: 1, hat: 3, outfit: 0 }, { color: 0, hat: 1, outfit: 0 }, () => {}); // para pruebas
 
   socket.on('s', (list) => {
     for (const [id, x, y, f, m] of list) {

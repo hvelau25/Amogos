@@ -88,6 +88,22 @@ window.Sound = (function () {
       tone(900, 0.06, { type: 'square', vol: 0.1, at: 0.02, to: 300 });
     },
     muerte: () => { tone(330, 0.5, { type: 'sawtooth', vol: 0.14, to: 70 }); noise(0.4, { freq: 600, to: 100, vol: 0.14 }); },
+    // Escena de muerte
+    swoosh: () => noise(0.18, { freq: 700, to: 3200, q: 1.5, vol: 0.16 }),
+    mordida: () => {
+      tone(130, 0.08, { type: 'square', vol: 0.2, to: 60 });
+      noise(0.14, { freq: 2600, to: 500, vol: 0.26, at: 0.03 });
+      tone(95, 0.12, { type: 'square', vol: 0.16, at: 0.16, to: 50 });
+      noise(0.1, { freq: 1800, to: 400, vol: 0.2, at: 0.19 });
+    },
+    carga: () => tone(200, 0.32, { type: 'sawtooth', vol: 0.06, to: 1300 }),
+    rayo: () => { tone(1500, 0.35, { type: 'sawtooth', vol: 0.1, to: 180 }); noise(0.35, { freq: 4200, q: 0.7, vol: 0.15 }); },
+    salto: () => tone(280, 0.25, { type: 'triangle', vol: 0.12, to: 900 }),
+    golpe: () => {
+      tone(90, 0.25, { vol: 0.35, to: 40 });
+      noise(0.12, { freq: 900, vol: 0.22 });
+      tone(420, 0.45, { type: 'triangle', vol: 0.1, to: 1500, at: 0.1 });
+    },
     ventila: () => {
       tone(320, 0.05, { type: 'square', vol: 0.08, to: 180 });
       noise(0.09, { freq: 2600, q: 3, vol: 0.12, at: 0.02 });

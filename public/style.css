@@ -1168,3 +1168,13 @@ input { border-radius: var(--chueco2); border: 3px solid #4a5590; }
 .tarjeta-camaras { width: min(860px, 100%); gap: 6px; padding: 10px 12px; }
 .camaras-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .camara { width: 100%; height: auto; aspect-ratio: 320 / 196; display: block; border: 3px solid var(--tinta); border-radius: 8px; background: #05070f; max-height: calc((100vh - 70px) / 2); object-fit: contain; }
+
+/* Aviso para iPhone: Safari no deja poner pantalla completa a una página; hay que agregarla a inicio */
+.aviso-ios { margin: 2px 0 0; font-size: 12px; line-height: 1.35; color: #c9d2f5; text-align: center; }
+.aviso-ios b { color: #ffd34d; }
+.error:empty + .aviso-ios { margin-top: -0.9em; }
+
+/* Escena de muerte: un panel tipo cómic encima de todo (menos el aviso de girar) */
+.escena-muerte { position: fixed; inset: 0; z-index: 32; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, .85); }
+.escena-muerte.oculto { display: none; }
+.escena-muerte canvas { width: min(96vw, calc(88vh * 600 / 280), 900px); aspect-ratio: 600 / 280; height: auto; border-radius: 16px; box-shadow: 0 0 0 5px #f4f1e8, 0 0 0 9px var(--tinta), 0 14px 40px rgba(0, 0, 0, .6); animation: entrar .35s cubic-bezier(.2, 1.4, .4, 1) both; }

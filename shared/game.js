@@ -70,7 +70,32 @@
 
   // Personalización: sombreros y outfits (dibujos propios, en render.js). Índice 0 = nada.
   const HATS = ['Nada', 'Gorra', 'Vaquero', 'Corona', 'Fiesta', 'Gorro de lana', 'Chef', 'Brote', 'Audífonos', 'Cuernos', 'Aureola', 'Copa', 'Flor'];
-  const OUTFITS = ['Nada', 'Corbata', 'Moño', 'Bufanda', 'Capa', 'Mochila', 'Placa', 'Tirantes'];
+  // Jerseys de local de la Liga MX, Apertura 2026 (investigados en nov. 2026). Solo colores y patrón,
+  // sin escudos ni patrocinadores. Cubren el torso; el short y las piernas quedan del color del jugador
+  // para que se le siga reconociendo. pat: liso | tono (patrón discreto) | franjas | mitades | banda
+  // (diagonal) | aros (horizontales) | centro (franja vertical central) | rayos (zigzag) | lineas (finas).
+  const JERSEYS = [
+    { name: 'América', base: '#ffd21f', pat: 'tono', cuello: '#13275c', manga: '#13275c', filo: '#d8262f' },
+    { name: 'Atlante', base: '#1f4fa8', pat: 'franjas', pc: '#9b1c2e', n: 5, cuello: '#13275c', manga: '#9b1c2e' },
+    { name: 'Atlas', base: '#d11f2f', pat: 'mitades', pc: '#15151b', cuello: '#15151b', manga: '#15151b' },
+    { name: 'San Luis', base: '#ffffff', pat: 'franjas', pc: '#d4202c', n: 5, cuello: '#1f3c88', manga: '#1f3c88' },
+    { name: 'Chivas', base: '#ffffff', pat: 'franjas', pc: '#d81e34', n: 5, cuello: '#14306b', manga: '#14306b' },
+    { name: 'Cruz Azul', base: '#1b4aa8', pat: 'tono', cuello: '#ffffff', manga: '#ffffff', filo: '#d8262f' },
+    { name: 'Juárez', base: '#9be22d', pat: 'equis', cuello: '#15151b', manga: '#15151b' },
+    { name: 'León', base: '#0b7a3b', pat: 'lineas', pc: 'rgba(160,240,170,0.55)', cuello: '#ffffff', manga: '#11a04c' },
+    { name: 'Monterrey', base: '#ffffff', pat: 'franjas', pc: '#12285e', n: 7, cuello: '#2050b8', manga: '#2050b8' },
+    { name: 'Necaxa', base: '#ffffff', pat: 'rayos', pc: '#d8262f', cuello: '#d8262f', manga: '#d8262f' },
+    { name: 'Pachuca', base: '#ffffff', pat: 'franjas', pc: '#1a4fb5', n: 3, cuello: '#1a4fb5', manga: '#1a4fb5' },
+    { name: 'Puebla', base: '#ffffff', pat: 'banda', pc: '#1f4ea8', cuello: '#1f4ea8', manga: '#1f4ea8' },
+    { name: 'Pumas', base: '#13254f', pat: 'liso', cuello: '#c9a227', manga: '#c9a227', filo: '#c9a227' },
+    { name: 'Querétaro', base: '#f4f6fa', pat: 'tono', cuello: '#15151b', manga: '#15151b', filo: '#2a5bd0' },
+    { name: 'Santos', base: '#1c8a3c', pat: 'aros', pc: '#ffffff', cuello: '#ffffff', manga: '#ffffff' },
+    { name: 'Tijuana', base: '#c8102e', pat: 'equis', cuello: '#15151b', manga: '#15151b' },
+    { name: 'Tigres', base: '#fdb913', pat: 'centro', pc: '#1d3a8a', cuello: '#1d3a8a', manga: '#1d3a8a' },
+    { name: 'Toluca', base: '#d0102a', pat: 'lineas', pc: 'rgba(255,255,255,0.7)', cuello: '#d0102a', manga: '#ffffff', filo: '#ffffff' },
+  ];
+  const JERSEY_FIRST = 8; // los jerseys van después de los outfits normales
+  const OUTFITS = ['Nada', 'Corbata', 'Moño', 'Bufanda', 'Capa', 'Mochila', 'Placa', 'Tirantes', ...JERSEYS.map((j) => j.name)];
 
   // Huella de choque de cada objeto (unidades de mundo, relativa a su centro): hw/hh = media anchura/altura, oy = desplazamiento.
   // Es un poco más chica que el dibujo para que se sienta natural.
@@ -465,5 +490,5 @@
     return i >= 0 ? map.rooms[i] : null;
   }
 
-  return { HATS, OUTFITS, freeSpot, lineOfSight, rayDist, taskPool, taskName, HARD_TASKS, MAP_CHOICES, SABOTAGE_COOLDOWN, REACTOR_TIME, LIGHTS_VISION, TASK_TYPES, TILE, PLAYER_RADIUS, PLAYER_SPEED, MAX_PLAYERS, NAME_MAX, MIN_PLAYERS, KILL_RANGE, REPORT_RANGE, USE_RANGE, VISION, CHAT_MAX, SETTINGS_OPTIONS, DEFAULT_SETTINGS, impostorCount, COLORS, MAPS, isSolidTile, collides, move, spawnPoint, roomAt };
+  return { HATS, OUTFITS, JERSEYS, JERSEY_FIRST, freeSpot, lineOfSight, rayDist, taskPool, taskName, HARD_TASKS, MAP_CHOICES, SABOTAGE_COOLDOWN, REACTOR_TIME, LIGHTS_VISION, TASK_TYPES, TILE, PLAYER_RADIUS, PLAYER_SPEED, MAX_PLAYERS, NAME_MAX, MIN_PLAYERS, KILL_RANGE, REPORT_RANGE, USE_RANGE, VISION, CHAT_MAX, SETTINGS_OPTIONS, DEFAULT_SETTINGS, impostorCount, COLORS, MAPS, isSolidTile, collides, move, spawnPoint, roomAt };
 });

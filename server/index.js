@@ -643,7 +643,7 @@ io.on('connection', (socket) => {
     socket.emit('corr', { x: p.x, y: p.y });
     p.killReadyAt = now + room.settings.killCooldown * 1000;
     const vs = io.sockets.sockets.get(t.socketId);
-    if (vs) vs.emit('muerte', { killerColor: p.color });
+    if (vs) vs.emit('muerte', { killerColor: p.color, killerHat: p.hat || 0, killerOutfit: p.outfit || 0 });
     if (checkWin(room)) return;
     sendRoom(room);
   });
